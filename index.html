@@ -24,14 +24,13 @@
         
         .pulse-red { animation: pulse-red 2s infinite; }
         @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            0 { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
             70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
 
         canvas { width: 100%; height: 60px; }
         
-        /* Modal Animation */
         .modal-enter { opacity: 0; transform: scale(0.95); }
         .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms, transform 200ms; }
     </style>
@@ -81,9 +80,10 @@
     <main class="flex-1 overflow-hidden flex flex-col md:flex-row p-2 sm:p-4 gap-4 max-w-[1600px] w-full mx-auto relative">
         
         <!-- Loading Overlay -->
-        <div id="loadingOverlay" class="absolute inset-0 z-20 bg-gray-50/80 dark:bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center hidden">
-            <div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div id="loadingOverlay" class="absolute inset-0 z-20 bg-gray-50/90 dark:bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center">
+            <div id="loadingSpinner" class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
             <p id="loadingText" class="text-blue-600 dark:text-blue-400 font-medium text-center px-4">กำลังเตรียมพร้อมระบบ...</p>
+            <button id="retryBtn" class="hidden mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">ลองใหม่อีกครั้ง</button>
         </div>
 
         <!-- Left Side: Source -->
@@ -161,15 +161,13 @@
         </div>
     </div>
 
-    <!-- Firebase & Logic Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- 1. CONFIGURATION HANDLING ---
-        // ค่าเหล่านี้จะถูกดึงมาจากระบบสภาพแวดล้อม (Canvas) 
-        // หากคุณรันบน Vercel ให้แก้ไข Object นี้ด้วยค่าจริงของคุณ
+        // --- 1. CONFIGURATION ---
+        // หากใช้งานบน Vercel ให้แก้ไข Object นี้ด้วยค่าจาก Firebase Console ของคุณ
         const defaultFirebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_AUTH_DOMAIN",
@@ -180,22 +178,16 @@
         };
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : defaultFirebaseConfig;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'standalone-app';
-        const apiKey = ""; // API Key สำหรับ Gemini จะใช้จากระบบอัตโนมัติ
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-standalone-id';
+        const geminiApiKey = ""; // เว้นว่างไว้สำหรับสภาพแวดล้อมที่รองรับอัตโนมัติ
 
         // --- 2. INITIALIZATION ---
-        let app, auth, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) {
-            console.error("Firebase init error", e);
-            document.getElementById('loadingText').innerText = "เกิดข้อผิดพลาดในการเชื่อมต่อ Firebase กรุณาตรวจสอบ Config";
-        }
+        let app, auth, db, currentUser, unsubscribeHistory;
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const retryBtn = document.getElementById('retryBtn');
 
-        let currentUser = null;
-        let unsubscribeHistory = null;
         const languages = [
             { code: 'th-TH', translateCode: 'Thai', name: 'ไทย (Thai)' },
             { code: 'en-US', translateCode: 'English', name: 'อังกฤษ (English)' },
@@ -213,18 +205,47 @@
         let isDarkMode = false;
         let audioContext, analyser, dataArray, mediaStreamSource, animationId;
 
-        const micBtn = document.getElementById('micBtn');
-        const micIcon = document.getElementById('micIcon');
-        const sourceContainer = document.getElementById('sourceContainer');
-        const targetContainer = document.getElementById('targetContainer');
-        const waveform = document.getElementById('waveform');
-        const visualizerContainer = document.getElementById('visualizerContainer');
-        const autoSpeakToggle = document.getElementById('autoSpeakToggle');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const cloudStatus = document.getElementById('cloudStatus');
-        const confirmModal = document.getElementById('confirmModal');
-
         async function init() {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+            } catch (err) {
+                showInitError("ไม่สามารถเชื่อมต่อ Firebase ได้ กรุณาตรวจสอบ Config");
+                return;
+            }
+
+            setupUI();
+            
+            // Auth Process (Rule 3)
+            loadingText.innerText = "กำลังเข้าสู่ระบบ...";
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth failed:", err);
+                // ถึงจะเข้าสู่ระบบไม่ได้ ก็ให้เข้าใช้งานแอปแบบออฟไลน์ (Local) ได้
+                hideLoading();
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                updateCloudStatus(user);
+                if (user) {
+                    loadHistory();
+                } else {
+                    hideLoading();
+                }
+            });
+
+            // Fallback: ถ้าโหลดนานเกิน 10 วินาที ให้ปิดหน้าจอโหลด
+            setTimeout(hideLoading, 10000);
+        }
+
+        function setupUI() {
             const srcSelect = document.getElementById('sourceLangSelect');
             const tgtSelect = document.getElementById('targetLangSelect');
             languages.forEach(l => {
@@ -234,16 +255,17 @@
             srcSelect.value = sourceLang.code;
             tgtSelect.value = targetLang.code;
 
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) toggleTheme(true);
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) toggleTheme(true);
 
-            micBtn.addEventListener('click', toggleListening);
-            document.getElementById('themeToggle').addEventListener('click', () => toggleTheme());
-            document.getElementById('swapBtn').addEventListener('click', swapLanguages);
-            document.getElementById('swapBtnMobile').addEventListener('click', swapLanguages);
-            document.getElementById('clearBtn').addEventListener('click', openClearModal);
-            document.getElementById('cancelClear').addEventListener('click', closeModal);
-            document.getElementById('confirmClear').addEventListener('click', confirmClearHistory);
-            
+            document.getElementById('micBtn').onclick = toggleListening;
+            document.getElementById('themeToggle').onclick = () => toggleTheme();
+            document.getElementById('swapBtn').onclick = swapLanguages;
+            document.getElementById('swapBtnMobile').onclick = swapLanguages;
+            document.getElementById('clearBtn').onclick = openClearModal;
+            document.getElementById('cancelClear').onclick = closeModal;
+            document.getElementById('confirmClear').onclick = confirmClearHistory;
+            retryBtn.onclick = () => window.location.reload();
+
             srcSelect.onchange = (e) => {
                 sourceLang = languages.find(l => l.code === e.target.value);
                 if (isListening) restartRecognition();
@@ -251,49 +273,46 @@
             tgtSelect.onchange = (e) => targetLang = languages.find(l => l.code === e.target.value);
 
             lucide.createIcons();
-            loadingOverlay.classList.remove('hidden');
-            
-            // Auth Logic (Rule 3)
-            const initAuth = async () => {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token).catch(() => signInAnonymously(auth));
-                } else {
-                    await signInAnonymously(auth);
-                }
-            };
+        }
 
-            await initAuth().catch(console.error);
+        function updateCloudStatus(user) {
+            const status = document.getElementById('cloudStatus');
+            if (user) {
+                status.innerHTML = `<i data-lucide="cloud-check" class="w-4 h-4 text-green-400"></i> ออนไลน์`;
+            } else {
+                status.innerHTML = `<i data-lucide="cloud-off" class="w-4 h-4 text-red-400"></i> ออฟไลน์`;
+            }
+            lucide.createIcons();
+        }
 
-            onAuthStateChanged(auth, (user) => {
-                currentUser = user;
-                if (user) {
-                    cloudStatus.innerHTML = `<i data-lucide="cloud-check" class="w-4 h-4 text-green-400"></i> ออนไลน์`;
-                    loadHistory();
-                } else {
-                    cloudStatus.innerHTML = `<i data-lucide="cloud-off" class="w-4 h-4 text-red-400"></i> ออฟไลน์`;
-                    if (unsubscribeHistory) unsubscribeHistory();
-                }
-                lucide.createIcons();
-            });
+        function showInitError(msg) {
+            loadingSpinner.classList.add('hidden');
+            loadingText.innerText = msg;
+            loadingText.classList.add('text-red-500');
+            retryBtn.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
         }
 
         // --- 3. FIRESTORE LOGIC ---
         function loadHistory() {
             if (!currentUser) return;
-            // Rule 1: Correct Path structure
+            loadingText.innerText = "กำลังดึงข้อมูลประวัติ...";
+            
             const historyRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'history');
             
             unsubscribeHistory = onSnapshot(historyRef, (snapshot) => {
                 const loaded = [];
                 snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
-                // Rule 2: Sort in memory
                 loaded.sort((a, b) => a.timestamp - b.timestamp);
                 sentences = loaded;
                 renderUI();
-                loadingOverlay.classList.add('hidden');
+                hideLoading();
             }, (error) => {
-                console.error("Firestore Error", error);
-                loadingOverlay.classList.add('hidden');
+                console.error("Firestore Listen Error:", error);
+                hideLoading();
             });
         }
 
@@ -328,46 +347,42 @@
             setTimeout(() => confirmModal.classList.add('hidden'), 200);
         }
 
-        // --- 4. GEMINI API WITH EXPONENTIAL BACKOFF ---
+        // --- 4. GEMINI API ---
         async function callGemini(text, from, to) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            const prompt = `Translate this text from ${from} to ${to}. Output ONLY the translated text. Text: "${text}"`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
+            const prompt = `Translate this text from ${from} to ${to}. Provide ONLY the translated text. Context: Speech translation app. Text: "${text}"`;
             
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }]
-            };
-
             for (let i = 0; i < 5; i++) {
                 try {
                     const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                     });
                     if (!response.ok) throw new Error();
                     const result = await response.json();
-                    return result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Error";
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Translation error";
                 } catch (e) {
                     await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
                 }
             }
-            return "ขออภัย ระบบไม่สามารถแปลภาษาได้ในขณะนี้";
+            return "ไม่สามารถแปลภาษาได้ (API Error)";
         }
 
-        // --- 5. SPEECH & UI ---
+        // --- 5. SPEECH & UI RENDERING ---
         function toggleListening() {
             if (isListening) stopListening();
             else startListening();
         }
 
         function startListening() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                alert("Browser not supported for speech.");
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) {
+                alert("เบราว์เซอร์ไม่รองรับ Speech Recognition");
                 return;
             }
 
-            recognition = new SpeechRecognition();
+            recognition = new SpeechRec();
             recognition.continuous = true;
             recognition.interimResults = true;
             recognition.lang = sourceLang.code;
@@ -408,28 +423,32 @@
             await saveTranslation(id, text, "...");
             const translation = await callGemini(text, sourceLang.translateCode, targetLang.translateCode);
             await saveTranslation(id, text, translation);
-            if (autoSpeakToggle.checked) speakText(translation);
+            if (document.getElementById('autoSpeakToggle').checked) speakText(translation);
         }
 
         function renderUI() {
             const hasData = sentences.length > 0;
-            document.getElementById('clearBtn').classList.toggle('hidden', !hasData);
+            const clearBtn = document.getElementById('clearBtn');
+            const srcCont = document.getElementById('sourceContainer');
+            const tgtCont = document.getElementById('targetContainer');
+
+            clearBtn.classList.toggle('hidden', !hasData);
 
             if (!hasData) {
-                sourceContainer.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 text-center gap-4"><i data-lucide="mic" class="w-8 h-8 opacity-20"></i><p>แตะปุ่มไมค์เพื่อเริ่มพูด</p></div>';
-                targetContainer.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 text-center gap-4"><i data-lucide="languages" class="w-8 h-8 opacity-20"></i><p>คำแปลจะปรากฏที่นี่</p></div>';
+                srcCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-30"><i data-lucide="mic" class="w-12 h-12 mb-2"></i><p>แตะปุ่มไมค์เพื่อเริ่มพูด</p></div>';
+                tgtCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-30"><i data-lucide="languages" class="w-12 h-12 mb-2"></i><p>คำแปลจะแสดงที่นี่</p></div>';
                 lucide.createIcons();
                 return;
             }
 
-            sourceContainer.innerHTML = '';
-            targetContainer.innerHTML = '';
+            srcCont.innerHTML = '';
+            tgtCont.innerHTML = '';
 
             sentences.forEach(s => {
                 const sEl = document.createElement('div');
-                sEl.className = 'bg-white dark:bg-slate-700 p-4 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm';
+                sEl.className = 'bg-white dark:bg-slate-700 p-4 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm transition-all hover:border-blue-200 dark:hover:border-blue-800';
                 sEl.innerText = s.source;
-                sourceContainer.appendChild(sEl);
+                srcCont.appendChild(sEl);
 
                 const tEl = document.createElement('div');
                 tEl.className = 'bg-blue-50/60 dark:bg-blue-900/30 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50 shadow-sm';
@@ -440,19 +459,19 @@
                     tEl.innerHTML = `
                         <div class="flex justify-between items-start gap-2">
                             <p class="text-blue-900 dark:text-blue-100 font-medium">${s.translation}</p>
-                            <button class="speak-item text-blue-400" data-text="${s.translation.replace(/"/g, '&quot;')}">
+                            <button class="speak-item text-blue-400 hover:text-blue-600 transition-colors" data-text="${s.translation.replace(/"/g, '&quot;')}">
                                 <i data-lucide="volume-2" class="w-5 h-5"></i>
                             </button>
                         </div>
                     `;
                 }
-                targetContainer.appendChild(tEl);
+                tgtCont.appendChild(tEl);
             });
 
             document.querySelectorAll('.speak-item').forEach(b => b.onclick = () => speakText(b.dataset.text));
             lucide.createIcons();
-            sourceContainer.scrollTop = sourceContainer.scrollHeight;
-            targetContainer.scrollTop = targetContainer.scrollHeight;
+            srcCont.scrollTop = srcCont.scrollHeight;
+            tgtCont.scrollTop = tgtCont.scrollHeight;
         }
 
         function updateInterimUI(text) {
@@ -461,25 +480,27 @@
             if (!text) return;
             const div = document.createElement('div');
             div.id = 'interim-box';
-            div.className = 'bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 opacity-60 italic';
+            div.className = 'bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 opacity-60 italic text-sm';
             div.innerText = text + "...";
-            sourceContainer.appendChild(div);
-            sourceContainer.scrollTop = sourceContainer.scrollHeight;
+            document.getElementById('sourceContainer').appendChild(div);
+            document.getElementById('sourceContainer').scrollTop = document.getElementById('sourceContainer').scrollHeight;
         }
 
         function updateMicUI() {
+            const btn = document.getElementById('micBtn');
+            const icon = document.getElementById('micIcon');
             if (isListening) {
-                micBtn.className = "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-red-500 hover:bg-red-600 shadow-xl transition-all transform active:scale-95 flex items-center justify-center pulse-red";
-                micIcon.setAttribute('data-lucide', 'square');
+                btn.className = "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-red-500 hover:bg-red-600 shadow-xl transition-all transform active:scale-95 flex items-center justify-center pulse-red";
+                icon.setAttribute('data-lucide', 'square');
                 document.getElementById('recordingIndicator').classList.remove('hidden');
                 document.getElementById('micStatusText').innerText = "กำลังรับเสียง...";
-                visualizerContainer.classList.remove('hidden');
+                document.getElementById('visualizerContainer').classList.remove('hidden');
             } else {
-                micBtn.className = "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-xl transition-all transform active:scale-95 flex items-center justify-center";
-                micIcon.setAttribute('data-lucide', 'mic');
+                btn.className = "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-xl transition-all transform active:scale-95 flex items-center justify-center";
+                icon.setAttribute('data-lucide', 'mic');
                 document.getElementById('recordingIndicator').classList.add('hidden');
                 document.getElementById('micStatusText').innerText = "แตะเพื่อพูด";
-                visualizerContainer.classList.add('hidden');
+                document.getElementById('visualizerContainer').classList.add('hidden');
             }
             lucide.createIcons();
         }
@@ -494,8 +515,8 @@
             navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
                 mediaStreamSource = audioContext.createMediaStreamSource(stream);
                 mediaStreamSource.connect(analyser);
-                draw();
-            }).catch(() => console.log("Mic access error for vis"));
+                drawVisualizer();
+            }).catch(e => console.error("Mic access denied", e));
         }
 
         function stopVisualizer() {
@@ -503,8 +524,8 @@
             if (mediaStreamSource) mediaStreamSource.disconnect();
         }
 
-        function draw() {
-            animationId = requestAnimationFrame(draw);
+        function drawVisualizer() {
+            animationId = requestAnimationFrame(drawVisualizer);
             analyser.getByteFrequencyData(dataArray);
             const ctx = waveform.getContext('2d');
             const w = waveform.width = waveform.offsetWidth;

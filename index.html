@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Voice Translator & History</title>
+    <title>AI Voice Translator & History (Google Translate)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -24,7 +24,7 @@
         
         .pulse-red { animation: pulse-red 2s infinite; }
         @keyframes pulse-red {
-            0 { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
             70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
@@ -51,7 +51,7 @@
     <header class="bg-blue-600 dark:bg-blue-800 text-white shadow-md z-10 shrink-0 transition-colors duration-300">
         <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <i data-lucide="sparkles" class="w-6 h-6 text-yellow-300"></i>
+                <i data-lucide="languages" class="w-6 h-6 text-yellow-300"></i>
                 <h1 class="text-xl font-bold hidden sm:block">AI Translator & History</h1>
                 <h1 class="text-xl font-bold sm:hidden">แปลภาษาสด</h1>
             </div>
@@ -84,6 +84,14 @@
             <div id="loadingSpinner" class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
             <p id="loadingText" class="text-blue-600 dark:text-blue-400 font-medium text-center px-4">กำลังเตรียมพร้อมระบบ...</p>
             <button id="retryBtn" class="hidden mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">ลองใหม่อีกครั้ง</button>
+            
+            <!-- Setup Guide -->
+            <div id="setupGuide" class="hidden mt-6 p-4 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-900 max-w-sm">
+                <p class="text-red-500 text-xs font-bold mb-2 uppercase">แนะนำการตั้งค่า:</p>
+                <p class="text-gray-600 dark:text-gray-300 text-xs leading-relaxed">
+                    คุณยังไม่ได้ใส่ค่า <b>Firebase Config</b> ในโค้ด กรุณานำค่าจาก Firebase Console มาวางในตัวแปร <code class="bg-gray-100 dark:bg-gray-700 px-1">defaultFirebaseConfig</code>
+                </p>
+            </div>
         </div>
 
         <!-- Left Side: Source -->
@@ -167,7 +175,6 @@
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- 1. CONFIGURATION ---
-        // หากใช้งานบน Vercel ให้แก้ไข Object นี้ด้วยค่าจาก Firebase Console ของคุณ
         const defaultFirebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_AUTH_DOMAIN",
@@ -178,8 +185,10 @@
         };
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : defaultFirebaseConfig;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-standalone-id';
-        const geminiApiKey = ""; // เว้นว่างไว้สำหรับสภาพแวดล้อมที่รองรับอัตโนมัติ
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'standalone-app';
+        
+        // Google Cloud Translation API Key
+        const googleApiKey = ""; // เว้นว่างไว้สำหรับสภาพแวดล้อมที่รองรับอัตโนมัติ หรือใส่ Key ของคุณเอง
 
         // --- 2. INITIALIZATION ---
         let app, auth, db, currentUser, unsubscribeHistory;
@@ -187,14 +196,15 @@
         const loadingText = document.getElementById('loadingText');
         const loadingSpinner = document.getElementById('loadingSpinner');
         const retryBtn = document.getElementById('retryBtn');
+        const setupGuide = document.getElementById('setupGuide');
 
         const languages = [
-            { code: 'th-TH', translateCode: 'Thai', name: 'ไทย (Thai)' },
-            { code: 'en-US', translateCode: 'English', name: 'อังกฤษ (English)' },
-            { code: 'ja-JP', translateCode: 'Japanese', name: 'ญี่ปุ่น (Japanese)' },
-            { code: 'ko-KR', translateCode: 'Korean', name: 'เกาหลี (Korean)' },
-            { code: 'zh-CN', translateCode: 'Chinese Simplified', name: 'จีน (Chinese)' },
-            { code: 'fr-FR', translateCode: 'French', name: 'ฝรั่งเศส (French)' },
+            { code: 'th-TH', iso: 'th', name: 'ไทย (Thai)' },
+            { code: 'en-US', iso: 'en', name: 'อังกฤษ (English)' },
+            { code: 'ja-JP', iso: 'ja', name: 'ญี่ปุ่น (Japanese)' },
+            { code: 'ko-KR', iso: 'ko', name: 'เกาหลี (Korean)' },
+            { code: 'zh-CN', iso: 'zh-CN', name: 'จีน (Chinese)' },
+            { code: 'fr-FR', iso: 'fr', name: 'ฝรั่งเศส (French)' },
         ];
 
         let isListening = false;
@@ -206,19 +216,23 @@
         let audioContext, analyser, dataArray, mediaStreamSource, animationId;
 
         async function init() {
+            if (firebaseConfig.apiKey === "YOUR_API_KEY" && typeof __firebase_config === 'undefined') {
+                showSetupError();
+                return;
+            }
+
             try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
             } catch (err) {
-                showInitError("ไม่สามารถเชื่อมต่อ Firebase ได้ กรุณาตรวจสอบ Config");
+                showInitError("การเชื่อมต่อฐานข้อมูลขัดข้อง");
                 return;
             }
 
-            setupUI();
+            setupUIListeners();
             
-            // Auth Process (Rule 3)
-            loadingText.innerText = "กำลังเข้าสู่ระบบ...";
+            loadingText.innerText = "กำลังเชื่อมต่อระบบ Cloud...";
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -227,7 +241,6 @@
                 }
             } catch (err) {
                 console.error("Auth failed:", err);
-                // ถึงจะเข้าสู่ระบบไม่ได้ ก็ให้เข้าใช้งานแอปแบบออฟไลน์ (Local) ได้
                 hideLoading();
             }
 
@@ -241,11 +254,10 @@
                 }
             });
 
-            // Fallback: ถ้าโหลดนานเกิน 10 วินาที ให้ปิดหน้าจอโหลด
-            setTimeout(hideLoading, 10000);
+            setTimeout(hideLoading, 8000);
         }
 
-        function setupUI() {
+        function setupUIListeners() {
             const srcSelect = document.getElementById('sourceLangSelect');
             const tgtSelect = document.getElementById('targetLangSelect');
             languages.forEach(l => {
@@ -285,6 +297,12 @@
             lucide.createIcons();
         }
 
+        function showSetupError() {
+            loadingSpinner.classList.add('hidden');
+            loadingText.innerText = "รอการตั้งค่า Firebase";
+            setupGuide.classList.remove('hidden');
+        }
+
         function showInitError(msg) {
             loadingSpinner.classList.add('hidden');
             loadingText.innerText = msg;
@@ -299,8 +317,6 @@
         // --- 3. FIRESTORE LOGIC ---
         function loadHistory() {
             if (!currentUser) return;
-            loadingText.innerText = "กำลังดึงข้อมูลประวัติ...";
-            
             const historyRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'history');
             
             unsubscribeHistory = onSnapshot(historyRef, (snapshot) => {
@@ -347,29 +363,41 @@
             setTimeout(() => confirmModal.classList.add('hidden'), 200);
         }
 
-        // --- 4. GEMINI API ---
-        async function callGemini(text, from, to) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
-            const prompt = `Translate this text from ${from} to ${to}. Provide ONLY the translated text. Context: Speech translation app. Text: "${text}"`;
+        // --- 4. GOOGLE TRANSLATE API ---
+        async function callGoogleTranslate(text, source, target) {
+            // ดึงค่า iso code 2 ตัวแรก (เช่น th-TH -> th)
+            const sourceCode = source.split('-')[0];
+            const targetCode = target.split('-')[0];
             
+            const url = `https://translation.googleapis.com/language/translate/v2?key=${googleApiKey}`;
+            
+            const payload = {
+                q: text,
+                source: sourceCode,
+                target: targetCode,
+                format: 'text'
+            };
+
             for (let i = 0; i < 5; i++) {
                 try {
                     const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                        body: JSON.stringify(payload)
                     });
+                    
                     if (!response.ok) throw new Error();
+                    
                     const result = await response.json();
-                    return result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Translation error";
+                    return result.data.translations[0].translatedText;
                 } catch (e) {
                     await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
                 }
             }
-            return "ไม่สามารถแปลภาษาได้ (API Error)";
+            return "การแปลผิดพลาด (API Error)";
         }
 
-        // --- 5. SPEECH & UI RENDERING ---
+        // --- 5. SPEECH & UI ---
         function toggleListening() {
             if (isListening) stopListening();
             else startListening();
@@ -421,7 +449,7 @@
         async function processSentence(text) {
             const id = "msg_" + Date.now();
             await saveTranslation(id, text, "...");
-            const translation = await callGemini(text, sourceLang.translateCode, targetLang.translateCode);
+            const translation = await callGoogleTranslate(text, sourceLang.code, targetLang.code);
             await saveTranslation(id, text, translation);
             if (document.getElementById('autoSpeakToggle').checked) speakText(translation);
         }
@@ -435,8 +463,8 @@
             clearBtn.classList.toggle('hidden', !hasData);
 
             if (!hasData) {
-                srcCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-30"><i data-lucide="mic" class="w-12 h-12 mb-2"></i><p>แตะปุ่มไมค์เพื่อเริ่มพูด</p></div>';
-                tgtCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-30"><i data-lucide="languages" class="w-12 h-12 mb-2"></i><p>คำแปลจะแสดงที่นี่</p></div>';
+                srcCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-30"><i data-lucide="mic" class="w-12 h-12 mb-2"></i><p>เริ่มพูดเพื่อแปลภาษา</p></div>';
+                tgtCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-30"><i data-lucide="languages" class="w-12 h-12 mb-2"></i><p>ผลลัพธ์จะแสดงที่นี่</p></div>';
                 lucide.createIcons();
                 return;
             }

@@ -80,10 +80,10 @@
     <!-- Main Content -->
     <main class="flex-1 overflow-hidden flex flex-col md:flex-row p-2 sm:p-4 gap-4 max-w-[1600px] w-full mx-auto relative">
         
-        <!-- Loading Overlay (Initial DB Load) -->
+        <!-- Loading Overlay -->
         <div id="loadingOverlay" class="absolute inset-0 z-20 bg-gray-50/80 dark:bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center hidden">
             <div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p class="text-blue-600 dark:text-blue-400 font-medium">กำลังโหลดประวัติ...</p>
+            <p class="text-blue-600 dark:text-blue-400 font-medium">กำลังเตรียมพร้อม...</p>
         </div>
 
         <!-- Left Side: Source -->
@@ -91,7 +91,6 @@
             <div class="bg-gray-50 dark:bg-slate-900/50 p-3 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between gap-2 shrink-0">
                 <div class="flex items-center gap-2 flex-1">
                     <select id="sourceLangSelect" class="bg-transparent dark:text-white text-sm font-semibold outline-none border-b-2 border-transparent focus:border-blue-500 px-1 py-1 cursor-pointer">
-                        <!-- Options via JS -->
                     </select>
                 </div>
                 <div id="recordingIndicator" class="hidden flex items-center gap-2 text-red-500 text-xs font-bold animate-pulse bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-md border border-red-100 dark:border-red-900/50">
@@ -100,11 +99,10 @@
             </div>
 
             <div id="sourceContainer" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
-                <!-- Content injected by JS -->
             </div>
         </section>
 
-        <!-- Middle: Swap (Desktop) -->
+        <!-- Middle: Swap -->
         <div class="hidden md:flex flex-col justify-center shrink-0">
             <button id="swapBtn" class="p-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-full hover:bg-blue-50 dark:hover:bg-slate-600 transition shadow-sm transform hover:scale-105 active:scale-95 text-slate-600 dark:text-slate-300">
                 <i data-lucide="arrow-right-left" class="w-5 h-5"></i>
@@ -115,12 +113,10 @@
         <section class="flex-1 flex flex-col bg-blue-50/30 dark:bg-blue-900/10 rounded-xl shadow-sm border border-blue-100 dark:border-blue-900/30 overflow-hidden transition-colors duration-300">
             <div class="bg-blue-50/80 dark:bg-slate-900/50 p-3 border-b border-blue-100 dark:border-slate-700 flex items-center justify-between gap-2 shrink-0">
                 <select id="targetLangSelect" class="bg-transparent dark:text-white text-sm font-semibold outline-none border-b-2 border-transparent focus:border-blue-500 px-1 py-1 cursor-pointer">
-                    <!-- Options via JS -->
                 </select>
             </div>
 
             <div id="targetContainer" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
-                <!-- Content injected by JS -->
             </div>
         </section>
     </main>
@@ -159,8 +155,8 @@
             </div>
             <p class="text-gray-600 dark:text-gray-300 text-sm mb-6">คุณแน่ใจหรือไม่ที่จะลบประวัติการแปลทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
             <div class="flex items-center justify-end gap-3">
-                <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition">ยกเลิก</button>
-                <button onclick="confirmClearHistory()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition shadow-sm">ลบข้อมูล</button>
+                <button id="cancelClear" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition">ยกเลิก</button>
+                <button id="confirmClear" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition shadow-sm">ลบข้อมูล</button>
             </div>
         </div>
     </div>
@@ -171,10 +167,10 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Config (Injected by Environment) ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // --- Firebase Config ---
+        const firebaseConfig = JSON.parse(__firebase_config);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const apiKey = ""; // Environment API Key for Gemini
+        const apiKey = ""; // Runtime provides the key
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -192,19 +188,15 @@
             { code: 'fr-FR', translateCode: 'French', name: 'ฝรั่งเศส (French)' },
         ];
 
-        // --- State Management ---
         let isListening = false;
-        let sentences = []; // Data from Firestore
+        let sentences = [];
         let sourceLang = languages[0];
         let targetLang = languages[1];
         let recognition = null;
         let isDarkMode = false;
-        let isTranslatingIds = new Set(); // Track IDs currently being translated
         
-        // Audio Visualizer State
         let audioContext, analyser, dataArray, mediaStreamSource, animationId;
 
-        // --- Elements ---
         const micBtn = document.getElementById('micBtn');
         const micIcon = document.getElementById('micIcon');
         const sourceContainer = document.getElementById('sourceContainer');
@@ -218,7 +210,6 @@
 
         // --- Initialization ---
         async function init() {
-            // Setup selects
             const srcSelect = document.getElementById('sourceLangSelect');
             const tgtSelect = document.getElementById('targetLangSelect');
             languages.forEach(l => {
@@ -228,20 +219,17 @@
             srcSelect.value = sourceLang.code;
             tgtSelect.value = targetLang.code;
 
-            // Check Theme Preference (System Default first)
             if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                 toggleTheme(true);
             }
 
-            // Event Listeners
             micBtn.addEventListener('click', toggleListening);
             document.getElementById('themeToggle').addEventListener('click', () => toggleTheme());
             document.getElementById('swapBtn').addEventListener('click', swapLanguages);
             document.getElementById('swapBtnMobile').addEventListener('click', swapLanguages);
-            document.getElementById('clearBtn').addEventListener('click', () => {
-                confirmModal.classList.remove('hidden');
-                setTimeout(() => confirmModal.firstElementChild.classList.add('modal-enter-active'), 10);
-            });
+            document.getElementById('clearBtn').addEventListener('click', openClearModal);
+            document.getElementById('cancelClear').addEventListener('click', closeModal);
+            document.getElementById('confirmClear').addEventListener('click', confirmClearHistory);
             
             srcSelect.onchange = (e) => {
                 sourceLang = languages.find(l => l.code === e.target.value);
@@ -253,36 +241,37 @@
 
             lucide.createIcons();
 
-            // Init Firebase Auth
             loadingOverlay.classList.remove('hidden');
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+            
+            // Auth Flow (Rule 3)
+            const initAuth = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (err) {
+                    console.error("Auth Error:", err);
                 }
-            } catch (err) {
-                console.error("Auth init error:", err);
-                loadingOverlay.classList.add('hidden');
-            }
+            };
 
-            // Setup Auth Listener
+            await initAuth();
+
             onAuthStateChanged(auth, (user) => {
+                currentUser = user;
                 if (user) {
-                    currentUser = user;
                     cloudStatus.innerHTML = `<i data-lucide="cloud-check" class="w-4 h-4 text-green-400"></i> ออนไลน์`;
-                    lucide.createIcons();
                     loadHistory();
                 } else {
-                    currentUser = null;
                     cloudStatus.innerHTML = `<i data-lucide="cloud-off" class="w-4 h-4 text-red-400"></i> ออฟไลน์`;
-                    lucide.createIcons();
                     if (unsubscribeHistory) unsubscribeHistory();
                 }
+                lucide.createIcons();
             });
         }
 
-        // --- Firebase Data Functions ---
+        // --- Firestore ---
         function loadHistory() {
             if (!currentUser) return;
             const historyRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'history');
@@ -290,7 +279,6 @@
             unsubscribeHistory = onSnapshot(historyRef, (snapshot) => {
                 const loaded = [];
                 snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
-                // Sort by timestamp memory (Rule 2: No complex queries)
                 loaded.sort((a, b) => a.timestamp - b.timestamp);
                 sentences = loaded;
                 renderUI();
@@ -301,7 +289,7 @@
             });
         }
 
-        async function saveTranslationState(id, text, translationText) {
+        async function saveTranslation(id, text, translationText) {
             if (!currentUser) return;
             try {
                 const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'history', id);
@@ -312,60 +300,56 @@
                     targetLang: targetLang.code,
                     timestamp: Date.now()
                 });
-            } catch (err) {
-                console.error("Save Error:", err);
-            }
+            } catch (err) { console.error("Save Error:", err); }
         }
 
-        window.confirmClearHistory = async function() {
+        async function confirmClearHistory() {
             if (!currentUser) return;
             try {
                 const deletePromises = sentences.map(s => 
                     deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'history', s.id))
                 );
                 await Promise.all(deletePromises);
-            } catch (err) {
-                console.error("Clear Error:", err);
-            }
+            } catch (err) { console.error("Clear Error:", err); }
             closeModal();
-        };
+        }
 
-        window.closeModal = function() {
+        function openClearModal() {
+            confirmModal.classList.remove('hidden');
+            setTimeout(() => confirmModal.firstElementChild.classList.add('modal-enter-active'), 10);
+        }
+
+        function closeModal() {
             confirmModal.firstElementChild.classList.remove('modal-enter-active');
             setTimeout(() => confirmModal.classList.add('hidden'), 200);
-        };
+        }
 
-        // --- Gemini AI Function ---
-        async function callGeminiAI(text, from, to) {
-            const systemPrompt = `You are a professional real-time translator. Translate the given text from ${from} to ${to}. Provide ONLY the translated text. Maintain the tone and context. Keep it natural.`;
-            const userQuery = `Translate: "${text}"`;
-            let retries = 3;
-            let delay = 1000;
+        // --- Gemini API with Backoff ---
+        async function callGemini(text, from, to) {
+            const systemPrompt = `You are a professional real-time translator. Translate from ${from} to ${to}. Provide ONLY the translated text. Keep it natural.`;
+            const payload = {
+                contents: [{ parts: [{ text: `Translate: "${text}"` }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
 
-            while (retries > 0) {
+            for (let i = 0; i < 5; i++) {
                 try {
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: userQuery }] }],
-                            systemInstruction: { parts: [{ text: systemPrompt }] }
-                        })
+                        body: JSON.stringify(payload)
                     });
-
-                    if (!response.ok) throw new Error('API Error');
+                    if (!response.ok) throw new Error();
                     const result = await response.json();
-                    return result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Translation error";
-                } catch (err) {
-                    retries--;
-                    if (retries === 0) return "ขออภัย ระบบแปลภาษาขัดข้อง";
-                    await new Promise(r => setTimeout(r, delay));
-                    delay *= 2;
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Error";
+                } catch (e) {
+                    await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
                 }
             }
+            return "ขออภัย ระบบแปลภาษาขัดข้องชั่วคราว";
         }
 
-        // --- Core Application Flow ---
+        // --- Voice Logic ---
         function toggleListening() {
             if (isListening) stopListening();
             else startListening();
@@ -374,7 +358,7 @@
         function startListening() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                alert("เบราว์เซอร์ของคุณไม่รองรับการพิมพ์ด้วยเสียง แนะนำให้ใช้ Google Chrome");
+                alert("Browser doesn't support Speech Recognition.");
                 return;
             }
 
@@ -394,7 +378,7 @@
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     const text = event.results[i][0].transcript.trim();
                     if (event.results[i].isFinal) {
-                        if (text) processFinalSentence(text);
+                        if (text) processSentence(text);
                     } else {
                         interim += text;
                     }
@@ -402,11 +386,7 @@
                 updateInterimUI(interim);
             };
 
-            recognition.onerror = (e) => {
-                console.error("Speech Rec Error:", e.error);
-                if (e.error === 'not-allowed') stopListening();
-            };
-
+            recognition.onerror = () => stopListening();
             recognition.onend = () => { if (isListening) recognition.start(); };
             
             try { recognition.start(); } catch(e) {}
@@ -420,229 +400,154 @@
             updateInterimUI('');
         }
 
-        async function processFinalSentence(text) {
-            const id = Date.now().toString();
-            isTranslatingIds.add(id);
-            
-            // 1. Save placeholder to DB instantly
-            await saveTranslationState(id, text, 'กำลังประมวลผล...');
-            
-            // 2. Call AI
-            const translation = await callGeminiAI(text, sourceLang.translateCode, targetLang.translateCode);
-            
-            // 3. Update DB with real translation
-            isTranslatingIds.delete(id);
-            await saveTranslationState(id, text, translation);
-
-            // 4. Auto Speak if toggled
-            if (autoSpeakToggle.checked) speak(translation);
+        async function processSentence(text) {
+            const id = "msg_" + Date.now();
+            await saveTranslation(id, text, "...");
+            const translation = await callGemini(text, sourceLang.translateCode, targetLang.translateCode);
+            await saveTranslation(id, text, translation);
+            if (autoSpeakToggle.checked) speakText(translation);
         }
 
-        // --- UI Rendering ---
+        // --- UI Utils ---
         function renderUI() {
             const hasData = sentences.length > 0;
             document.getElementById('clearBtn').classList.toggle('hidden', !hasData);
 
-            // Empty States
             if (!hasData) {
-                sourceContainer.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 text-center gap-4"><div class="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-full"><i data-lucide="mic" class="w-8 h-8 opacity-50"></i></div><p class="text-sm font-medium">กดปุ่มไมโครโฟนเพื่อเริ่มพูด</p></div>';
-                targetContainer.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 text-center gap-4"><div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-full"><i data-lucide="languages" class="w-8 h-8 opacity-50 text-blue-400"></i></div><p class="text-sm font-medium">คำแปลและการบันทึกประวัติจะแสดงที่นี่</p></div>';
+                sourceContainer.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 text-center gap-4"><i data-lucide="mic" class="w-8 h-8 opacity-30"></i><p>แตะไมโครโฟนเพื่อพูด</p></div>';
+                targetContainer.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 text-center gap-4"><i data-lucide="languages" class="w-8 h-8 opacity-30"></i><p>ผลการแปลจะแสดงที่นี่</p></div>';
                 lucide.createIcons();
                 return;
             }
 
-            // Render Lists
             sourceContainer.innerHTML = '';
             targetContainer.innerHTML = '';
 
             sentences.forEach(s => {
-                const isTranslating = s.translation === 'กำลังประมวลผล...';
-
-                // Source Item
+                const isTranslating = s.translation === "...";
+                
                 const sEl = document.createElement('div');
-                sEl.className = 'bg-white dark:bg-slate-700 p-3 sm:p-4 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm transition-all relative overflow-hidden group';
-                sEl.innerHTML = `
-                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <p class="text-gray-800 dark:text-slate-100 text-[15px] sm:text-base">${s.source}</p>
-                    <span class="text-[10px] text-gray-400 dark:text-gray-500 block mt-2">${new Date(s.timestamp).toLocaleTimeString('th-TH')}</span>
-                `;
+                sEl.className = 'bg-white dark:bg-slate-700 p-4 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm';
+                sEl.innerHTML = `<p class="text-gray-800 dark:text-slate-100">${s.source}</p>`;
                 sourceContainer.appendChild(sEl);
 
-                // Target Item
                 const tEl = document.createElement('div');
-                tEl.className = 'bg-blue-50/60 dark:bg-blue-900/30 p-3 sm:p-4 rounded-xl border border-blue-100 dark:border-blue-800/50 shadow-sm flex flex-col gap-2 relative group';
-                
-                const header = document.createElement('div');
-                header.className = 'flex justify-between items-start gap-2';
+                tEl.className = 'bg-blue-50/60 dark:bg-blue-900/30 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50 shadow-sm';
                 
                 if (isTranslating) {
-                    header.innerHTML = `
-                        <div class="flex items-center gap-2 text-blue-500 dark:text-blue-400">
-                            <div class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                            <p class="text-sm font-medium animate-pulse">${s.translation}</p>
+                    tEl.innerHTML = `<div class="flex items-center gap-2 text-blue-500"><div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div><p>กำลังแปล...</p></div>`;
+                } else {
+                    tEl.innerHTML = `
+                        <div class="flex justify-between items-start gap-2">
+                            <p class="text-blue-900 dark:text-blue-100 font-medium">${s.translation}</p>
+                            <button class="speak-btn text-blue-400 hover:text-blue-600" data-text="${s.translation.replace(/"/g, '&quot;')}">
+                                <i data-lucide="volume-2" class="w-5 h-5"></i>
+                            </button>
                         </div>
                     `;
-                } else {
-                    header.innerHTML = `
-                        <p class="text-blue-900 dark:text-blue-100 font-medium text-[15px] sm:text-lg flex-1 leading-relaxed">${s.translation}</p>
-                        <button onclick="window.speakText('${s.translation.replace(/'/g, "\\'")}')" class="text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 p-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-colors" title="ฟังเสียง">
-                            <i data-lucide="volume-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
-                        </button>
-                    `;
                 }
-
-                tEl.appendChild(header);
                 targetContainer.appendChild(tEl);
             });
 
+            // Re-bind speak buttons
+            document.querySelectorAll('.speak-btn').forEach(btn => {
+                btn.onclick = () => speakText(btn.getAttribute('data-text'));
+            });
+
             lucide.createIcons();
-            
-            // Auto scroll to bottom
-            setTimeout(() => {
-                sourceContainer.scrollTop = sourceContainer.scrollHeight;
-                targetContainer.scrollTop = targetContainer.scrollHeight;
-            }, 50);
+            sourceContainer.scrollTop = sourceContainer.scrollHeight;
+            targetContainer.scrollTop = targetContainer.scrollHeight;
         }
 
         function updateInterimUI(text) {
-            const oldInt = document.getElementById('interim-src');
-            if (oldInt) oldInt.remove();
+            const old = document.getElementById('interim-box');
+            if (old) old.remove();
             if (!text) return;
 
             const div = document.createElement('div');
-            div.id = 'interim-src';
-            div.className = 'bg-gray-50 dark:bg-slate-800/50 p-3 sm:p-4 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 opacity-70 animate-pulse';
-            div.innerHTML = `<p class="italic text-gray-500 dark:text-gray-400 text-[15px] sm:text-base">"${text}..."</p>`;
+            div.id = 'interim-box';
+            div.className = 'bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 opacity-60 italic';
+            div.innerText = text + "...";
             sourceContainer.appendChild(div);
             sourceContainer.scrollTop = sourceContainer.scrollHeight;
         }
 
         function updateMicUI() {
             if (isListening) {
-                micBtn.classList.replace('bg-blue-600', 'bg-red-500');
-                micBtn.classList.replace('hover:bg-blue-700', 'hover:bg-red-600');
-                micBtn.classList.add('pulse-red');
+                micBtn.className = "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-red-500 hover:bg-red-600 shadow-xl transition-all transform active:scale-95 flex items-center justify-center group pulse-red";
                 micIcon.setAttribute('data-lucide', 'square');
                 document.getElementById('recordingIndicator').classList.remove('hidden');
                 document.getElementById('micStatusText').innerText = "กำลังรับเสียง...";
-                document.getElementById('micStatusText').classList.add('text-red-500');
                 visualizerContainer.classList.remove('hidden');
             } else {
-                micBtn.classList.replace('bg-red-500', 'bg-blue-600');
-                micBtn.classList.replace('hover:bg-red-600', 'hover:bg-blue-700');
-                micBtn.classList.remove('pulse-red');
+                micBtn.className = "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-xl transition-all transform active:scale-95 flex items-center justify-center group";
                 micIcon.setAttribute('data-lucide', 'mic');
                 document.getElementById('recordingIndicator').classList.add('hidden');
                 document.getElementById('micStatusText').innerText = "แตะเพื่อพูด";
-                document.getElementById('micStatusText').classList.remove('text-red-500');
                 visualizerContainer.classList.add('hidden');
             }
             lucide.createIcons();
         }
 
-        // --- Audio Visualizer ---
         function startVisualizer() {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioContext.createAnalyser();
-                analyser.fftSize = 128; // Lower for thicker bars
+                analyser.fftSize = 64;
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
             }
-            
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
-
             navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
                 mediaStreamSource = audioContext.createMediaStreamSource(stream);
                 mediaStreamSource.connect(analyser);
-                drawWaveform();
-            }).catch(err => console.error("Mic access denied for visualizer", err));
+                drawWave();
+            });
         }
 
         function stopVisualizer() {
             if (animationId) cancelAnimationFrame(animationId);
-            if (mediaStreamSource) {
-                mediaStreamSource.disconnect();
-                mediaStreamSource = null;
-            }
+            if (mediaStreamSource) mediaStreamSource.disconnect();
         }
 
-        function drawWaveform() {
-            animationId = requestAnimationFrame(drawWaveform);
+        function drawWave() {
+            animationId = requestAnimationFrame(drawWave);
             analyser.getByteFrequencyData(dataArray);
-            
             const ctx = waveform.getContext('2d');
-            const width = waveform.width = waveform.offsetWidth;
-            const height = waveform.height = waveform.offsetHeight;
+            const w = waveform.width = waveform.offsetWidth;
+            const h = waveform.height = waveform.offsetHeight;
+            ctx.clearRect(0, 0, w, h);
             
-            ctx.clearRect(0, 0, width, height);
-            
-            const barWidth = (width / dataArray.length) * 2;
+            const barWidth = (w / dataArray.length) * 2.5;
             let x = 0;
-
             for (let i = 0; i < dataArray.length; i++) {
-                const barHeight = (dataArray[i] / 255) * height * 0.8;
-                
-                // Gradient based on theme
-                const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
-                if (isDarkMode) {
-                    gradient.addColorStop(0, '#1e3a8a'); // dark blue
-                    gradient.addColorStop(1, '#60a5fa'); // light blue
-                } else {
-                    gradient.addColorStop(0, '#2563eb');
-                    gradient.addColorStop(1, '#93c5fd');
-                }
-
-                ctx.fillStyle = gradient;
-                
-                // Draw rounded bars
-                ctx.beginPath();
-                ctx.roundRect(x, height - barHeight, barWidth - 2, barHeight, [4, 4, 0, 0]);
-                ctx.fill();
-                
+                const barHeight = (dataArray[i] / 255) * h;
+                ctx.fillStyle = isDarkMode ? '#60a5fa' : '#2563eb';
+                if (ctx.roundRect) ctx.beginPath(), ctx.roundRect(x, h - barHeight, barWidth - 2, barHeight, 4), ctx.fill();
+                else ctx.fillRect(x, h - barHeight, barWidth - 2, barHeight);
                 x += barWidth;
             }
         }
 
-        // --- Utils ---
         function toggleTheme(forceDark = null) {
-            if (forceDark !== null) {
-                isDarkMode = forceDark;
-            } else {
-                isDarkMode = !isDarkMode;
-            }
-            
-            if (isDarkMode) {
-                document.documentElement.classList.add('dark');
-                document.getElementById('themeIcon').setAttribute('data-lucide', 'sun');
-            } else {
-                document.documentElement.classList.remove('dark');
-                document.getElementById('themeIcon').setAttribute('data-lucide', 'moon');
-            }
+            isDarkMode = forceDark !== null ? forceDark : !isDarkMode;
+            document.documentElement.classList.toggle('dark', isDarkMode);
+            document.getElementById('themeIcon').setAttribute('data-lucide', isDarkMode ? 'sun' : 'moon');
             lucide.createIcons();
-            
-            // Redraw visualizer to apply correct colors immediately if active
-            if (isListening) drawWaveform();
         }
 
         function swapLanguages() {
-            const temp = sourceLang;
-            sourceLang = targetLang;
-            targetLang = temp;
+            [sourceLang, targetLang] = [targetLang, sourceLang];
             document.getElementById('sourceLangSelect').value = sourceLang.code;
             document.getElementById('targetLangSelect').value = targetLang.code;
             if (isListening) restartRecognition();
         }
 
-        window.speakText = function(text) {
-            if (!('speechSynthesis' in window)) return;
+        function speakText(text) {
+            if (!window.speechSynthesis) return;
             window.speechSynthesis.cancel();
             const ut = new SpeechSynthesisUtterance(text);
             ut.lang = targetLang.code;
-            ut.rate = 1.0;
             window.speechSynthesis.speak(ut);
-        };
+        }
 
         function restartRecognition() {
             if (recognition) {
@@ -655,5 +560,4 @@
     </script>
 </body>
 </html>
-
 

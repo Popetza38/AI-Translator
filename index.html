@@ -1,587 +1,456 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Voice Translator & History</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;700&display=swap');
-        
-        :root { --primary: #2563eb; }
-        html.dark { --primary: #3b82f6; }
+import React, { useState, useEffect, useRef } from 'react';
+import { Mic, MicOff, ArrowRightLeft, Volume2, Globe, AlertCircle, Copy, Download, Check } from 'lucide-react';
 
-        body {
-            font-family: 'Sarabun', sans-serif;
-            transition: background-color 0.3s, color 0.3s;
+// รายการภาษาที่รองรับเบื้องต้น
+const languages = [
+  { code: 'th-TH', translateCode: 'th', name: 'ไทย (Thai)' },
+  { code: 'en-US', translateCode: 'en', name: 'อังกฤษ (English)' },
+  { code: 'ja-JP', translateCode: 'ja', name: 'ญี่ปุ่น (Japanese)' },
+  { code: 'ko-KR', translateCode: 'ko', name: 'เกาหลี (Korean)' },
+  { code: 'zh-CN', translateCode: 'zh-CN', name: 'จีนตัวย่อ (Chinese Simplified)' },
+  { code: 'es-ES', translateCode: 'es', name: 'สเปน (Spanish)' },
+  { code: 'fr-FR', translateCode: 'fr', name: 'ฝรั่งเศส (French)' },
+  { code: 'de-DE', translateCode: 'de', name: 'เยอรมัน (German)' },
+];
+
+export default function App() {
+  const [isListening, setIsListening] = useState(false);
+  const [sourceLang, setSourceLang] = useState(languages[0]);
+  const [targetLang, setTargetLang] = useState(languages[1]);
+  
+  const [sentences, setSentences] = useState([]);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [interimTranslation, setInterimTranslation] = useState('');
+  
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [error, setError] = useState('');
+  const [isSupported, setIsSupported] = useState(true);
+  
+  // สถานะสำหรับการ Copy/Export
+  const [copiedSrc, setCopiedSrc] = useState(false);
+  const [copiedTgt, setCopiedTgt] = useState(false);
+
+  const recognitionRef = useRef(null);
+  const translateTimeoutRef = useRef(null);
+  const isListeningRef = useRef(false);
+
+  const sourceEndRef = useRef(null);
+  const translationEndRef = useRef(null);
+
+  // ตรวจสอบการรองรับ Web Speech API
+  useEffect(() => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      setIsSupported(false);
+      setError('เบราว์เซอร์ของคุณไม่รองรับการแปลงเสียงเป็นข้อความ (แนะนำให้ใช้ Google Chrome)');
+    }
+  }, []);
+
+  // ฟังก์ชันแปลภาษาผ่าน Google Translate
+  const translateText = async (text, sl, tl) => {
+    if (!text.trim()) return '';
+    try {
+      setIsTranslating(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) throw new Error('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์แปลภาษาได้');
+      
+      const data = await response.json();
+      const translatedText = data[0].map((item) => item[0]).join('');
+      return translatedText;
+    } catch (err) {
+      console.error("Translation Error:", err);
+      return '...';
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const processFinalTranscript = async (text) => {
+    const id = Date.now().toString() + Math.random().toString();
+    setSentences(prev => [...prev, { id, source: text, translation: 'กำลังแปล...' }]);
+    
+    const translatedText = await translateText(text, sourceLang.translateCode, targetLang.translateCode);
+    
+    setSentences(prev => prev.map(s => s.id === id ? { ...s, translation: translatedText } : s));
+  };
+
+  // เลื่อนจอลงอัตโนมัติ
+  useEffect(() => {
+    sourceEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    translationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [sentences, interimTranscript, interimTranslation]);
+
+  // จัดการ Interim text
+  useEffect(() => {
+    if (translateTimeoutRef.current) {
+      clearTimeout(translateTimeoutRef.current);
+    }
+
+    if (interimTranscript.trim() === '') {
+      setInterimTranslation('');
+      return;
+    }
+
+    translateTimeoutRef.current = setTimeout(async () => {
+      const result = await translateText(interimTranscript, sourceLang.translateCode, targetLang.translateCode);
+      if (result !== '...') {
+        setInterimTranslation(result);
+      }
+    }, 500);
+
+    return () => clearTimeout(translateTimeoutRef.current);
+  }, [interimTranscript, sourceLang, targetLang]);
+
+  const toggleListening = () => {
+    if (isListening) stopListening();
+    else startListening();
+  };
+
+  const startListening = () => {
+    setError('');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    isListeningRef.current = true;
+
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = sourceLang.code;
+
+    recognitionRef.current.onstart = () => {
+      setIsListening(true);
+      isListeningRef.current = true;
+    };
+
+    recognitionRef.current.onresult = (event) => {
+      let currentInterim = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          const finalStr = event.results[i][0].transcript.trim();
+          if (finalStr) {
+            processFinalTranscript(finalStr);
+          }
+        } else {
+          currentInterim += event.results[i][0].transcript;
         }
+      }
+      setInterimTranscript(currentInterim);
+    };
 
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+    recognitionRef.current.onerror = (event) => {
+      if (event.error === 'not-allowed') {
+        setError('กรุณาอนุญาตให้ใช้งานไมโครโฟน');
+        setIsListening(false);
+        isListeningRef.current = false;
+      }
+    };
+
+    recognitionRef.current.onend = () => {
+      if (isListeningRef.current) {
+        setTimeout(() => {
+          if (isListeningRef.current && recognitionRef.current) {
+            try { recognitionRef.current.start(); } 
+            catch (e) { console.error(e); }
+          }
+        }, 300);
+      }
+    };
+
+    try {
+      recognitionRef.current.start();
+    } catch (e) {
+      console.error(e);
+      setIsListening(false);
+      isListeningRef.current = false;
+    }
+  };
+
+  const stopListening = () => {
+    setIsListening(false);
+    isListeningRef.current = false;
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setInterimTranscript('');
+    setInterimTranslation('');
+  };
+
+  const swapLanguages = () => {
+    setSourceLang(targetLang);
+    setTargetLang(sourceLang);
+    clearText();
+    if (isListening) {
+      stopListening();
+      setTimeout(startListening, 100);
+    }
+  };
+
+  const speakText = (text) => {
+    if ('speechSynthesis' in window && text && text !== 'กำลังแปล...') {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = targetLang.code;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const clearText = () => {
+    if (window.confirm("คุณต้องการล้างข้อความทั้งหมดใช่หรือไม่?")) {
+      setSentences([]);
+      setInterimTranscript('');
+      setInterimTranslation('');
+    }
+  };
+
+  // ฟังก์ชันคัดลอกข้อความ
+  const copyText = (type) => {
+    if (sentences.length === 0) return;
+    
+    let textToCopy = '';
+    if (type === 'source') {
+      textToCopy = sentences.map(s => s.source).join('\n');
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        setCopiedSrc(true);
+        setTimeout(() => setCopiedSrc(false), 2000);
+      });
+    } else {
+      textToCopy = sentences.map(s => s.translation).join('\n');
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        setCopiedTgt(true);
+        setTimeout(() => setCopiedTgt(false), 2000);
+      });
+    }
+  };
+
+  // ฟังก์ชันดาวน์โหลดเป็นไฟล์ .txt
+  const downloadText = () => {
+    if (sentences.length === 0) return;
+    
+    const textContent = sentences.map(s => `[${sourceLang.name}]: ${s.source}\n[${targetLang.name}]: ${s.translation}\n`).join('\n');
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `translation_export_${new Date().getTime()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans text-slate-800 overflow-hidden">
+      
+      {/* Header Bar */}
+      <div className="bg-blue-600 text-white shadow-md z-10 shrink-0">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Globe className="w-6 h-6" />
+            <h1 className="text-xl font-bold hidden sm:block">โปรแกรมแปลภาษาสดแบบเรียลไทม์</h1>
+            <h1 className="text-xl font-bold sm:hidden">แปลภาษาสด</h1>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={downloadText}
+              disabled={sentences.length === 0}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition ${sentences.length > 0 ? 'bg-blue-500 hover:bg-blue-400 text-white' : 'bg-blue-700/50 text-blue-300 cursor-not-allowed'}`}
+              title="ดาวน์โหลดเป็นไฟล์ .txt"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden md:inline">ส่งออก (TXT)</span>
+            </button>
+            {(sentences.length > 0 || interimTranscript) && (
+              <button
+                onClick={clearText}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-400 text-white transition"
+              >
+                ล้างทั้งหมด
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border-b border-red-200 p-2 flex items-center justify-center gap-2 text-red-600 shrink-0">
+          <AlertCircle className="w-4 h-4" />
+          <span className="text-sm font-medium">{error}</span>
+        </div>
+      )}
+
+      {/* Main Content Area (Full Screen Grid) */}
+      <div className="flex-1 overflow-hidden flex flex-col md:flex-row p-2 sm:p-4 gap-4 max-w-[1600px] w-full mx-auto">
         
-        .pulse-red { animation: pulse-red 2s infinite; }
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
-
-        canvas { width: 100%; height: 60px; display: block; }
-        
-        .modal-enter { opacity: 0; transform: scale(0.95); }
-        .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms, transform 200ms; }
-    </style>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Sarabun', 'sans-serif'] }
-                }
-            }
-        }
-    </script>
-</head>
-<body class="bg-gray-50 dark:bg-slate-900 h-screen flex flex-col text-slate-800 dark:text-slate-100 overflow-hidden">
-
-    <!-- Header -->
-    <header class="bg-blue-600 dark:bg-blue-800 text-white shadow-md z-10 shrink-0">
-        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <i data-lucide="sparkles" class="w-6 h-6 text-yellow-300"></i>
-                <h1 class="text-xl font-bold hidden sm:block font-sans">AI Translator & History</h1>
-                <h1 class="text-xl font-bold sm:hidden">แปลภาษาสด</h1>
+        {/* Left Side: Source */}
+        <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-h-0">
+          {/* Header & Controls */}
+          <div className="bg-gray-50 p-3 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center gap-2 flex-1">
+              <span className={`w-2 h-2 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : 'bg-gray-400'}`}></span>
+              <select
+                className="bg-white border border-gray-300 text-gray-700 rounded-lg py-1.5 px-3 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none w-full max-w-[200px]"
+                value={sourceLang.code}
+                onChange={(e) => {
+                  setSourceLang(languages.find(l => l.code === e.target.value));
+                  if (isListening) stopListening();
+                }}
+                disabled={isListening}
+              >
+                {languages.map((lang) => (
+                  <option key={`src-${lang.code}`} value={lang.code}>{lang.name}</option>
+                ))}
+              </select>
             </div>
             
-            <div class="flex items-center gap-3">
-                <span id="cloudStatus" class="flex items-center gap-1 text-xs font-medium text-blue-200">
-                    <i data-lucide="cloud-off" class="w-4 h-4"></i> ออฟไลน์
-                </span>
-                <button id="themeToggle" class="p-2 hover:bg-white/20 rounded-full transition">
-                    <i data-lucide="moon" id="themeIcon" class="w-5 h-5"></i>
-                </button>
-                <div class="h-6 w-px bg-white/30"></div>
-                <button id="clearBtn" class="hidden px-3 py-1.5 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-400 text-white transition shadow-sm">
-                    ล้างประวัติ
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Visualizer Area -->
-    <div id="visualizerContainer" class="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 h-16 hidden flex items-center px-4 shadow-inner">
-        <canvas id="waveform"></canvas>
-    </div>
-
-    <!-- Main Content -->
-    <main class="flex-1 overflow-hidden flex flex-col md:flex-row p-2 sm:p-4 gap-4 max-w-[1600px] w-full mx-auto relative">
-        
-        <div id="loadingOverlay" class="absolute inset-0 z-20 bg-gray-50/80 dark:bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center hidden">
-            <div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p class="text-blue-600 dark:text-blue-400 font-medium">กำลังโหลดประวัติ...</p>
-        </div>
-
-        <!-- Left Side: Source -->
-        <section class="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-            <div class="bg-gray-50 dark:bg-slate-900/50 p-3 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between gap-2 shrink-0">
-                <div class="flex items-center gap-2 flex-1">
-                    <select id="sourceLangSelect" class="bg-transparent dark:text-white text-sm font-semibold outline-none border-b-2 border-transparent focus:border-blue-500 px-1 py-1 cursor-pointer">
-                    </select>
-                </div>
-                <div id="recordingIndicator" class="hidden flex items-center gap-2 text-red-500 text-xs font-bold animate-pulse bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-md border border-red-100 dark:border-red-900/50">
-                    <span class="w-2 h-2 rounded-full bg-red-500"></span> REC
-                </div>
-            </div>
-
-            <div id="sourceContainer" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
-            </div>
-        </section>
-
-        <!-- Middle: Swap -->
-        <div class="hidden md:flex flex-col justify-center shrink-0">
-            <button id="swapBtn" class="p-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-full hover:bg-blue-50 dark:hover:bg-slate-600 transition shadow-sm transform hover:scale-105 active:scale-95 text-slate-600 dark:text-slate-300">
-                <i data-lucide="arrow-right-left" class="w-5 h-5"></i>
+            <button
+              onClick={() => copyText('source')}
+              disabled={sentences.length === 0}
+              className={`p-1.5 rounded-md flex items-center gap-1 text-xs font-medium transition ${sentences.length > 0 ? 'text-gray-500 hover:bg-gray-200' : 'text-gray-300'}`}
+              title="คัดลอกข้อความต้นฉบับ"
+            >
+              {copiedSrc ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+              <span className="hidden sm:inline">{copiedSrc ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
             </button>
+          </div>
+
+          {/* Text Area */}
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-slate-50">
+            {sentences.map((s) => (
+              <div key={`src-${s.id}`} className="bg-white p-3 sm:p-4 rounded-lg border border-gray-100 shadow-sm">
+                <p className="text-gray-800 text-base sm:text-lg leading-relaxed">{s.source}</p>
+              </div>
+            ))}
+            
+            {interimTranscript && (
+              <div className="bg-white/50 p-3 sm:p-4 rounded-lg border border-gray-200 border-dashed">
+                <p className="text-gray-400 italic text-base sm:text-lg leading-relaxed">{interimTranscript} ...</p>
+              </div>
+            )}
+
+            {sentences.length === 0 && !interimTranscript && (
+              <div className="h-full flex items-center justify-center text-gray-400 text-center p-4">
+                รอรับเสียงพูด...
+              </div>
+            )}
+            <div ref={sourceEndRef} />
+          </div>
         </div>
 
-        <!-- Right Side: Translation -->
-        <section class="flex-1 flex flex-col bg-blue-50/30 dark:bg-blue-900/10 rounded-xl shadow-sm border border-blue-100 dark:border-blue-900/30 overflow-hidden">
-            <div class="bg-blue-50/80 dark:bg-slate-900/50 p-3 border-b border-blue-100 dark:border-slate-700 flex items-center justify-between gap-2 shrink-0">
-                <select id="targetLangSelect" class="bg-transparent dark:text-white text-sm font-semibold outline-none border-b-2 border-transparent focus:border-blue-500 px-1 py-1 cursor-pointer">
-                </select>
+        {/* Center: Swap Button (Hidden on Mobile) */}
+        <div className="hidden md:flex flex-col justify-center shrink-0">
+          <button
+            onClick={swapLanguages}
+            className="p-3 bg-white border border-gray-300 rounded-full hover:bg-blue-50 hover:text-blue-600 transition shadow-sm hover:scale-110"
+            title="สลับภาษา"
+          >
+            <ArrowRightLeft className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Right Side: Translation */}
+        <div className="flex-1 flex flex-col bg-blue-50/30 rounded-xl shadow-sm border border-blue-100 overflow-hidden min-h-0">
+          {/* Header & Controls */}
+          <div className="bg-blue-50/80 p-3 border-b border-blue-100 flex flex-wrap items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center gap-2 flex-1">
+              {isTranslating ? (
+                <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>
+              ) : (
+                <span className="w-3 h-3"></span>
+              )}
+              <select
+                className="bg-white border border-blue-200 text-blue-900 rounded-lg py-1.5 px-3 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none w-full max-w-[200px]"
+                value={targetLang.code}
+                onChange={(e) => setTargetLang(languages.find(l => l.code === e.target.value))}
+              >
+                {languages.map((lang) => (
+                  <option key={`tgt-${lang.code}`} value={lang.code}>{lang.name}</option>
+                ))}
+              </select>
             </div>
 
-            <div id="targetContainer" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
-            </div>
-        </section>
-    </main>
+            <button
+              onClick={() => copyText('target')}
+              disabled={sentences.length === 0}
+              className={`p-1.5 rounded-md flex items-center gap-1 text-xs font-medium transition ${sentences.length > 0 ? 'text-blue-600 hover:bg-blue-100' : 'text-blue-300'}`}
+              title="คัดลอกคำแปล"
+            >
+              {copiedTgt ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+              <span className="hidden sm:inline">{copiedTgt ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
+            </button>
+          </div>
 
-    <!-- Bottom Controls -->
-    <footer class="p-4 sm:p-6 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 shadow-lg shrink-0 flex items-center justify-center relative">
-        <button id="swapBtnMobile" class="md:hidden absolute left-4 sm:left-6 p-2.5 sm:p-3 bg-gray-100 dark:bg-slate-700 rounded-full text-gray-600 dark:text-slate-300 shadow-sm">
-            <i data-lucide="arrow-right-left" class="w-5 h-5"></i>
+          {/* Text Area */}
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-white">
+            {sentences.map((s) => (
+              <div key={`tgt-${s.id}`} className="bg-blue-50/50 p-3 sm:p-4 rounded-lg border border-blue-100 shadow-sm flex justify-between items-start gap-3 group hover:border-blue-300 transition-colors">
+                <p className="text-blue-900 font-medium text-lg sm:text-xl leading-relaxed flex-1">
+                  {s.translation}
+                </p>
+                {s.translation !== 'กำลังแปล...' && (
+                  <button 
+                    onClick={() => speakText(s.translation)}
+                    className="text-gray-400 hover:text-blue-600 transition p-1.5 rounded-full hover:bg-blue-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 shrink-0"
+                    title="อ่านออกเสียง"
+                  >
+                    <Volume2 className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {interimTranslation && (
+              <div className="bg-blue-50/30 p-3 sm:p-4 rounded-lg border border-blue-200 border-dashed">
+                <p className="text-blue-400 italic font-medium text-lg sm:text-xl leading-relaxed">{interimTranslation} ...</p>
+              </div>
+            )}
+
+            {sentences.length === 0 && !interimTranslation && (
+              <div className="h-full flex items-center justify-center text-gray-400 text-center p-4">
+                คำแปลจะปรากฏที่นี่
+              </div>
+            )}
+            <div ref={translationEndRef} />
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Floating Control Bar */}
+      <div className="p-4 bg-white border-t border-gray-200 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] shrink-0 flex items-center justify-center relative">
+        {/* Mobile Swap Button (Absolute Positioned) */}
+        <button
+          onClick={swapLanguages}
+          className="md:hidden absolute left-4 p-2.5 bg-gray-100 border border-gray-300 rounded-full hover:bg-gray-200 transition text-gray-600"
+          title="สลับภาษา"
+        >
+          <ArrowRightLeft className="w-5 h-5" />
         </button>
 
-        <div class="flex flex-col items-center gap-2">
-            <button id="micBtn" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-xl transition-all transform active:scale-95 flex items-center justify-center group relative overflow-hidden">
-                <div id="micHoverEffect" class="absolute inset-0 bg-white/20 scale-0 group-hover:scale-100 transition-transform rounded-full"></div>
-                <i id="micIcon" data-lucide="mic" class="w-8 h-8 sm:w-10 sm:h-10 relative z-10"></i>
-            </button>
-            <span id="micStatusText" class="text-[10px] sm:text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">แตะเพื่อพูด</span>
-        </div>
+        {/* Big Mic Button */}
+        <button
+          onClick={toggleListening}
+          disabled={!isSupported}
+          className={`relative flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white shadow-lg transition-transform transform hover:scale-105 ${
+            isListening 
+              ? 'bg-red-500 hover:bg-red-600 shadow-red-500/50' 
+              : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/50'
+          } ${!isSupported && 'opacity-50 cursor-not-allowed'}`}
+        >
+          {isListening && (
+            <span className="absolute w-full h-full rounded-full border-4 border-red-400 animate-ping opacity-75"></span>
+          )}
+          {isListening ? <Mic className="w-8 h-8 sm:w-10 sm:h-10 relative z-10" /> : <MicOff className="w-8 h-8 sm:w-10 sm:h-10" />}
+        </button>
+      </div>
 
-        <div class="absolute right-4 sm:right-6 flex flex-col items-end gap-2">
-            <label class="inline-flex items-center cursor-pointer bg-gray-50 dark:bg-slate-900/50 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
-                <span class="mr-2 sm:mr-3 text-[10px] sm:text-xs font-medium text-gray-600 dark:text-gray-300">อ่านอัตโนมัติ</span>
-                <input type="checkbox" id="autoSpeakToggle" class="sr-only peer">
-                <div class="relative w-8 sm:w-9 h-4 sm:h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 sm:after:h-4 after:w-3 sm:after:w-4 after:transition-all"></div>
-            </label>
-        </div>
-    </footer>
-
-    <!-- Confirm Modal -->
-    <div id="confirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden transition-opacity">
-        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 transform transition-all modal-enter border border-gray-100 dark:border-slate-700">
-            <div class="flex items-center gap-3 text-red-500 mb-4">
-                <div class="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
-                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-                </div>
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">ยืนยันการล้างประวัติ</h3>
-            </div>
-            <p class="text-gray-600 dark:text-gray-300 text-sm mb-6">คุณแน่ใจหรือไม่ที่จะลบประวัติการแปลทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
-            <div class="flex items-center justify-end gap-3">
-                <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition">ยกเลิก</button>
-                <button id="confirmDeleteBtn" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition shadow-sm">ลบข้อมูล</button>
-            </div>
-        </div>
     </div>
+  );
+}
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase Configuration
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'voice-translator-app';
-        const apiKey = ""; // Managed by environment
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        
-        let currentUser = null;
-        let unsubscribeHistory = null;
-
-        const languages = [
-            { code: 'th-TH', translateCode: 'Thai', name: 'ไทย (Thai)' },
-            { code: 'en-US', translateCode: 'English', name: 'อังกฤษ (English)' },
-            { code: 'ja-JP', translateCode: 'Japanese', name: 'ญี่ปุ่น (Japanese)' },
-            { code: 'ko-KR', translateCode: 'Korean', name: 'เกาหลี (Korean)' },
-            { code: 'zh-CN', translateCode: 'Chinese Simplified', name: 'จีน (Chinese)' },
-            { code: 'fr-FR', translateCode: 'French', name: 'ฝรั่งเศส (French)' },
-        ];
-
-        let isListening = false;
-        let sentences = [];
-        let sourceLang = languages[0];
-        let targetLang = languages[1];
-        let recognition = null;
-        let isDarkMode = false;
-        
-        // Visualizer State
-        let audioContext, analyser, dataArray, mediaStreamSource, animationId;
-
-        const micBtn = document.getElementById('micBtn');
-        const micIcon = document.getElementById('micIcon');
-        const sourceContainer = document.getElementById('sourceContainer');
-        const targetContainer = document.getElementById('targetContainer');
-        const waveform = document.getElementById('waveform');
-        const visualizerContainer = document.getElementById('visualizerContainer');
-        const autoSpeakToggle = document.getElementById('autoSpeakToggle');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const cloudStatus = document.getElementById('cloudStatus');
-        const confirmModal = document.getElementById('confirmModal');
-
-        async function init() {
-            // Setup Selects
-            const srcSelect = document.getElementById('sourceLangSelect');
-            const tgtSelect = document.getElementById('targetLangSelect');
-            languages.forEach(l => {
-                srcSelect.add(new Option(l.name, l.code));
-                tgtSelect.add(new Option(l.name, l.code));
-            });
-            srcSelect.value = sourceLang.code;
-            tgtSelect.value = targetLang.code;
-
-            // System Theme Check
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                toggleTheme(true);
-            }
-
-            // Listeners
-            micBtn.addEventListener('click', toggleListening);
-            document.getElementById('themeToggle').addEventListener('click', () => toggleTheme());
-            document.getElementById('swapBtn').addEventListener('click', swapLanguages);
-            document.getElementById('swapBtnMobile').addEventListener('click', swapLanguages);
-            document.getElementById('clearBtn').addEventListener('click', () => {
-                confirmModal.classList.remove('hidden');
-                setTimeout(() => confirmModal.firstElementChild.classList.add('modal-enter-active'), 10);
-            });
-            document.getElementById('confirmDeleteBtn').addEventListener('click', confirmClearHistory);
-            
-            srcSelect.onchange = (e) => {
-                sourceLang = languages.find(l => l.code === e.target.value);
-                if (isListening) restartRecognition();
-            };
-            tgtSelect.onchange = (e) => {
-                targetLang = languages.find(l => l.code === e.target.value);
-            };
-
-            lucide.createIcons();
-
-            // Firebase Auth
-            loadingOverlay.classList.remove('hidden');
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                console.error("Auth init failed:", err);
-            }
-
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUser = user;
-                    cloudStatus.innerHTML = `<i data-lucide="cloud-check" class="w-4 h-4 text-green-400"></i> ออนไลน์`;
-                    lucide.createIcons();
-                    loadHistory();
-                } else {
-                    currentUser = null;
-                    cloudStatus.innerHTML = `<i data-lucide="cloud-off" class="w-4 h-4 text-red-400"></i> ออฟไลน์`;
-                    lucide.createIcons();
-                    if (unsubscribeHistory) unsubscribeHistory();
-                    loadingOverlay.classList.add('hidden');
-                }
-            });
-        }
-
-        function loadHistory() {
-            if (!currentUser) return;
-            // RULE 1: Strict Paths
-            const historyRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'history');
-            
-            unsubscribeHistory = onSnapshot(historyRef, (snapshot) => {
-                const loaded = [];
-                snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
-                // RULE 2: No complex queries, sort in memory
-                loaded.sort((a, b) => a.timestamp - b.timestamp);
-                sentences = loaded;
-                renderUI();
-                loadingOverlay.classList.add('hidden');
-            }, (error) => {
-                console.error("Firestore Error:", error);
-                loadingOverlay.classList.add('hidden');
-            });
-        }
-
-        async function saveTranslation(id, text, translationText) {
-            if (!currentUser) return;
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'history', id);
-                await setDoc(docRef, {
-                    source: text,
-                    translation: translationText,
-                    sourceLang: sourceLang.code,
-                    targetLang: targetLang.code,
-                    timestamp: Date.now()
-                });
-            } catch (err) { console.error("Save failed:", err); }
-        }
-
-        async function confirmClearHistory() {
-            if (!currentUser) return;
-            const historyRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'history');
-            try {
-                // Delete all sequentially (avoiding complex batching for simplicity)
-                for (const s of sentences) {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'history', s.id));
-                }
-            } catch (err) { console.error("Clear failed:", err); }
-            closeModal();
-        }
-
-        window.closeModal = function() {
-            confirmModal.firstElementChild.classList.remove('modal-enter-active');
-            setTimeout(() => confirmModal.classList.add('hidden'), 200);
-        };
-
-        async function callGemini(text, from, to) {
-            const systemPrompt = `Translate the given text from ${from} to ${to}. Return ONLY translated text. Keep natural tone.`;
-            const payload = {
-                contents: [{ parts: [{ text: `Translate this: "${text}"` }] }],
-                systemInstruction: { parts: [{ text: systemPrompt }] }
-            };
-
-            let retries = 5;
-            let delay = 1000;
-            while (retries > 0) {
-                try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!response.ok) throw new Error('API Error');
-                    const data = await response.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Error translating";
-                } catch (e) {
-                    retries--;
-                    if (retries === 0) return "ขออภัย ระบบแปลภาษาขัดข้องชั่วคราว";
-                    await new Promise(r => setTimeout(r, delay));
-                    delay *= 2;
-                }
-            }
-        }
-
-        function toggleListening() {
-            if (isListening) stopListening();
-            else startListening();
-        }
-
-        function startListening() {
-            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRec) {
-                alert("Browser does not support Speech Recognition");
-                return;
-            }
-
-            if (recognition) {
-                recognition.onend = null;
-                recognition.stop();
-            }
-
-            recognition = new SpeechRec();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = sourceLang.code;
-
-            recognition.onstart = () => {
-                isListening = true;
-                updateMicUI();
-                startVisualizer();
-            };
-
-            recognition.onresult = (event) => {
-                let interim = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    const text = event.results[i][0].transcript.trim();
-                    if (event.results[i].isFinal) {
-                        if (text) handleFinalText(text);
-                    } else {
-                        interim += text;
-                    }
-                }
-                updateInterimUI(interim);
-            };
-
-            recognition.onerror = (e) => {
-                if (e.error !== 'no-speech') console.error("Speech Error:", e.error);
-                if (e.error === 'not-allowed') stopListening();
-            };
-
-            recognition.onend = () => {
-                if (isListening) {
-                    try { recognition.start(); } catch(e) {}
-                }
-            };
-            
-            try { recognition.start(); } catch(e) { console.error("Start error", e); }
-        }
-
-        function stopListening() {
-            isListening = false;
-            if (recognition) {
-                recognition.onend = null;
-                recognition.stop();
-            }
-            stopVisualizer();
-            updateMicUI();
-            updateInterimUI('');
-        }
-
-        async function handleFinalText(text) {
-            const id = Date.now().toString();
-            // Save initial processing state
-            await saveTranslation(id, text, 'กำลังแปล...');
-            
-            const result = await callGemini(text, sourceLang.translateCode, targetLang.translateCode);
-            await saveTranslation(id, text, result);
-
-            if (autoSpeakToggle.checked) speakText(result);
-        }
-
-        function renderUI() {
-            const hasData = sentences.length > 0;
-            document.getElementById('clearBtn').classList.toggle('hidden', !hasData);
-
-            if (!hasData) {
-                sourceContainer.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 text-center gap-2"><i data-lucide="mic" class="w-8 h-8 opacity-40"></i><p>แตะไมโครโฟนเพื่อพูด</p></div>';
-                targetContainer.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 text-center gap-2"><i data-lucide="languages" class="w-8 h-8 opacity-40"></i><p>ผลการแปลจะแสดงที่นี่</p></div>';
-                lucide.createIcons();
-                return;
-            }
-
-            sourceContainer.innerHTML = '';
-            targetContainer.innerHTML = '';
-
-            sentences.forEach(s => {
-                const isTranslating = s.translation === 'กำลังแปล...';
-
-                // Source Item
-                const sEl = document.createElement('div');
-                sEl.className = 'bg-white dark:bg-slate-700 p-3 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm animate-in fade-in slide-in-from-bottom-2';
-                sEl.innerHTML = `<p class="text-gray-800 dark:text-slate-100 text-sm sm:text-base">${s.source}</p>
-                    <span class="text-[10px] text-gray-400 mt-1 block">${new Date(s.timestamp).toLocaleTimeString('th-TH')}</span>`;
-                sourceContainer.appendChild(sEl);
-
-                // Target Item
-                const tEl = document.createElement('div');
-                tEl.className = 'bg-blue-50/50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-900/40 shadow-sm flex flex-col gap-1';
-                
-                if (isTranslating) {
-                    tEl.innerHTML = `<div class="flex items-center gap-2 text-blue-500"><div class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div><p class="text-sm italic">${s.translation}</p></div>`;
-                } else {
-                    tEl.innerHTML = `
-                        <div class="flex justify-between items-start gap-2">
-                            <p class="text-blue-900 dark:text-blue-100 font-medium text-sm sm:text-base flex-1">${s.translation}</p>
-                            <button onclick="window.speakText('${s.translation.replace(/'/g, "\\'")}')" class="text-blue-500 hover:text-blue-700 p-1">
-                                <i data-lucide="volume-2" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                    `;
-                }
-                targetContainer.appendChild(tEl);
-            });
-
-            lucide.createIcons();
-            
-            // Auto scroll
-            setTimeout(() => {
-                sourceContainer.scrollTop = sourceContainer.scrollHeight;
-                targetContainer.scrollTop = targetContainer.scrollHeight;
-            }, 100);
-        }
-
-        function updateInterimUI(text) {
-            const old = document.getElementById('interim-src');
-            if (old) old.remove();
-            if (!text) return;
-
-            const div = document.createElement('div');
-            div.id = 'interim-src';
-            div.className = 'bg-gray-50 dark:bg-slate-800/50 p-3 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 opacity-60 italic text-sm';
-            div.innerText = `${text}...`;
-            sourceContainer.appendChild(div);
-            sourceContainer.scrollTop = sourceContainer.scrollHeight;
-        }
-
-        function updateMicUI() {
-            if (isListening) {
-                micBtn.classList.replace('bg-blue-600', 'bg-red-500');
-                micBtn.classList.add('pulse-red');
-                micIcon.setAttribute('data-lucide', 'square');
-                document.getElementById('recordingIndicator').classList.remove('hidden');
-                document.getElementById('micStatusText').innerText = "กำลังรับเสียง...";
-                visualizerContainer.classList.remove('hidden');
-            } else {
-                micBtn.classList.replace('bg-red-500', 'bg-blue-600');
-                micBtn.classList.remove('pulse-red');
-                micIcon.setAttribute('data-lucide', 'mic');
-                document.getElementById('recordingIndicator').classList.add('hidden');
-                document.getElementById('micStatusText').innerText = "แตะเพื่อพูด";
-                visualizerContainer.classList.add('hidden');
-            }
-            lucide.createIcons();
-        }
-
-        function startVisualizer() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 64;
-                dataArray = new Uint8Array(analyser.frequencyBinCount);
-            }
-            if (audioContext.state === 'suspended') audioContext.resume();
-
-            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-                mediaStreamSource = audioContext.createMediaStreamSource(stream);
-                mediaStreamSource.connect(analyser);
-                drawWave();
-            }).catch(e => console.warn("Vis mic access error", e));
-        }
-
-        function stopVisualizer() {
-            if (animationId) cancelAnimationFrame(animationId);
-            if (mediaStreamSource) mediaStreamSource.disconnect();
-        }
-
-        function drawWave() {
-            animationId = requestAnimationFrame(drawWave);
-            analyser.getByteFrequencyData(dataArray);
-            const ctx = waveform.getContext('2d');
-            const w = waveform.width = waveform.offsetWidth;
-            const h = waveform.height = waveform.offsetHeight;
-            ctx.clearRect(0, 0, w, h);
-            
-            const barWidth = (w / dataArray.length);
-            let x = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-                const barHeight = (dataArray[i] / 255) * h;
-                ctx.fillStyle = isDarkMode ? '#60a5fa' : '#2563eb';
-                ctx.fillRect(x, h - barHeight, barWidth - 2, barHeight);
-                x += barWidth;
-            }
-        }
-
-        function toggleTheme(forceDark = null) {
-            isDarkMode = forceDark !== null ? forceDark : !isDarkMode;
-            document.documentElement.classList.toggle('dark', isDarkMode);
-            document.getElementById('themeIcon').setAttribute('data-lucide', isDarkMode ? 'sun' : 'moon');
-            lucide.createIcons();
-        }
-
-        function swapLanguages() {
-            const temp = sourceLang;
-            sourceLang = targetLang;
-            targetLang = temp;
-            document.getElementById('sourceLangSelect').value = sourceLang.code;
-            document.getElementById('targetLangSelect').value = targetLang.code;
-            if (isListening) restartRecognition();
-        }
-
-        function restartRecognition() {
-            if (recognition) {
-                recognition.stop();
-                setTimeout(() => { if (isListening) startListening(); }, 300);
-            }
-        }
-
-        window.speakText = function(text) {
-            if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel();
-            const ut = new SpeechSynthesisUtterance(text);
-            ut.lang = targetLang.code;
-            window.speechSynthesis.speak(ut);
-        };
-
-        window.onload = init;
-    </script>
-</body>
-</html>
 

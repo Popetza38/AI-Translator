@@ -86,10 +86,10 @@
             <button id="retryBtn" class="hidden mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">ลองใหม่อีกครั้ง</button>
             
             <!-- Setup Guide -->
-            <div id="setupGuide" class="hidden mt-6 p-4 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-900 max-w-sm">
+            <div id="setupGuide" class="hidden mt-6 p-4 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-900 max-w-sm text-center">
                 <p class="text-red-500 text-xs font-bold mb-2 uppercase">แนะนำการตั้งค่า:</p>
                 <p class="text-gray-600 dark:text-gray-300 text-xs leading-relaxed">
-                    คุณยังไม่ได้ใส่ค่า <b>Firebase Config</b> ในโค้ด กรุณานำค่าจาก Firebase Console มาวางในตัวแปร <code class="bg-gray-100 dark:bg-gray-700 px-1">defaultFirebaseConfig</code>
+                    แอปพลิเคชันกำลังพยายามเชื่อมต่อฐานข้อมูล กรุณารอครู่หนึ่งหรือตรวจสอบสัญญาณอินเทอร์เน็ต
                 </p>
             </div>
         </div>
@@ -152,7 +152,7 @@
         </div>
     </footer>
 
-    <!-- Custom Confirm Modal -->
+    <!-- Confirm Modal -->
     <div id="confirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden transition-opacity">
         <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 transform transition-all modal-enter border border-gray-100 dark:border-slate-700">
             <div class="flex items-center gap-3 text-red-500 mb-4">
@@ -161,7 +161,7 @@
                 </div>
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">ยืนยันการล้างประวัติ</h3>
             </div>
-            <p class="text-gray-600 dark:text-gray-300 text-sm mb-6">คุณแน่ใจหรือไม่ที่จะลบประวัติการแปลทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+            <p class="text-gray-600 dark:text-gray-300 text-sm mb-6">คุณแน่ใจหรือไม่ที่จะลบประวัติการแปลทั้งหมด?</p>
             <div class="flex items-center justify-end gap-3">
                 <button id="cancelClear" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition">ยกเลิก</button>
                 <button id="confirmClear" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition shadow-sm">ลบข้อมูล</button>
@@ -187,8 +187,8 @@
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : defaultFirebaseConfig;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'standalone-app';
         
-        // Google Cloud Translation API Key
-        const googleApiKey = ""; // เว้นว่างไว้สำหรับสภาพแวดล้อมที่รองรับอัตโนมัติ หรือใส่ Key ของคุณเอง
+        // Google Translate API Key (Environment provided)
+        const apiKey = ""; 
 
         // --- 2. INITIALIZATION ---
         let app, auth, db, currentUser, unsubscribeHistory;
@@ -196,7 +196,6 @@
         const loadingText = document.getElementById('loadingText');
         const loadingSpinner = document.getElementById('loadingSpinner');
         const retryBtn = document.getElementById('retryBtn');
-        const setupGuide = document.getElementById('setupGuide');
 
         const languages = [
             { code: 'th-TH', iso: 'th', name: 'ไทย (Thai)' },
@@ -216,23 +215,18 @@
         let audioContext, analyser, dataArray, mediaStreamSource, animationId;
 
         async function init() {
-            if (firebaseConfig.apiKey === "YOUR_API_KEY" && typeof __firebase_config === 'undefined') {
-                showSetupError();
-                return;
-            }
-
             try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
             } catch (err) {
-                showInitError("การเชื่อมต่อฐานข้อมูลขัดข้อง");
-                return;
+                console.error("Firebase init failed");
+                hideLoading();
             }
 
             setupUIListeners();
             
-            loadingText.innerText = "กำลังเชื่อมต่อระบบ Cloud...";
+            loadingText.innerText = "กำลังเชื่อมต่อระบบ...";
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -254,7 +248,7 @@
                 }
             });
 
-            setTimeout(hideLoading, 8000);
+            setTimeout(hideLoading, 6000);
         }
 
         function setupUIListeners() {
@@ -289,36 +283,16 @@
 
         function updateCloudStatus(user) {
             const status = document.getElementById('cloudStatus');
-            if (user) {
-                status.innerHTML = `<i data-lucide="cloud-check" class="w-4 h-4 text-green-400"></i> ออนไลน์`;
-            } else {
-                status.innerHTML = `<i data-lucide="cloud-off" class="w-4 h-4 text-red-400"></i> ออฟไลน์`;
-            }
+            status.innerHTML = user ? `<i data-lucide="cloud-check" class="w-4 h-4 text-green-400"></i> ออนไลน์` : `<i data-lucide="cloud-off" class="w-4 h-4 text-red-400"></i> ออฟไลน์`;
             lucide.createIcons();
         }
 
-        function showSetupError() {
-            loadingSpinner.classList.add('hidden');
-            loadingText.innerText = "รอการตั้งค่า Firebase";
-            setupGuide.classList.remove('hidden');
-        }
-
-        function showInitError(msg) {
-            loadingSpinner.classList.add('hidden');
-            loadingText.innerText = msg;
-            loadingText.classList.add('text-red-500');
-            retryBtn.classList.remove('hidden');
-        }
-
-        function hideLoading() {
-            loadingOverlay.classList.add('hidden');
-        }
+        function hideLoading() { loadingOverlay.classList.add('hidden'); }
 
         // --- 3. FIRESTORE LOGIC ---
         function loadHistory() {
             if (!currentUser) return;
             const historyRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'history');
-            
             unsubscribeHistory = onSnapshot(historyRef, (snapshot) => {
                 const loaded = [];
                 snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
@@ -327,7 +301,7 @@
                 renderUI();
                 hideLoading();
             }, (error) => {
-                console.error("Firestore Listen Error:", error);
+                console.error("Firestore Error", error);
                 hideLoading();
             });
         }
@@ -365,50 +339,38 @@
 
         // --- 4. GOOGLE TRANSLATE API ---
         async function callGoogleTranslate(text, source, target) {
-            // ดึงค่า iso code 2 ตัวแรก (เช่น th-TH -> th)
             const sourceCode = source.split('-')[0];
             const targetCode = target.split('-')[0];
+            const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
             
-            const url = `https://translation.googleapis.com/language/translate/v2?key=${googleApiKey}`;
-            
-            const payload = {
-                q: text,
-                source: sourceCode,
-                target: targetCode,
-                format: 'text'
-            };
-
             for (let i = 0; i < 5; i++) {
                 try {
                     const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify({
+                            q: text,
+                            source: sourceCode,
+                            target: targetCode,
+                            format: 'text'
+                        })
                     });
-                    
-                    if (!response.ok) throw new Error();
-                    
+                    if (!response.ok) throw new Error('Translate API Error');
                     const result = await response.json();
                     return result.data.translations[0].translatedText;
                 } catch (e) {
                     await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
                 }
             }
-            return "การแปลผิดพลาด (API Error)";
+            return "ไม่สามารถแปลภาษาได้";
         }
 
         // --- 5. SPEECH & UI ---
-        function toggleListening() {
-            if (isListening) stopListening();
-            else startListening();
-        }
+        function toggleListening() { isListening ? stopListening() : startListening(); }
 
         function startListening() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRec) {
-                alert("เบราว์เซอร์ไม่รองรับ Speech Recognition");
-                return;
-            }
+            if (!SpeechRec) return alert("Browser not supported");
 
             recognition = new SpeechRec();
             recognition.continuous = true;
@@ -434,8 +396,7 @@
 
             recognition.onerror = () => stopListening();
             recognition.onend = () => { if (isListening) recognition.start(); };
-            
-            try { recognition.start(); } catch(e) {}
+            recognition.start();
         }
 
         function stopListening() {
@@ -456,51 +417,41 @@
 
         function renderUI() {
             const hasData = sentences.length > 0;
-            const clearBtn = document.getElementById('clearBtn');
             const srcCont = document.getElementById('sourceContainer');
             const tgtCont = document.getElementById('targetContainer');
-
-            clearBtn.classList.toggle('hidden', !hasData);
+            document.getElementById('clearBtn').classList.toggle('hidden', !hasData);
 
             if (!hasData) {
-                srcCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-30"><i data-lucide="mic" class="w-12 h-12 mb-2"></i><p>เริ่มพูดเพื่อแปลภาษา</p></div>';
-                tgtCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-30"><i data-lucide="languages" class="w-12 h-12 mb-2"></i><p>ผลลัพธ์จะแสดงที่นี่</p></div>';
+                srcCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-20"><i data-lucide="mic" class="w-12 h-12 mb-2"></i><p>เริ่มพูดเพื่อแปลภาษา</p></div>';
+                tgtCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-20"><i data-lucide="languages" class="w-12 h-12 mb-2"></i><p>ผลการแปลจะแสดงที่นี่</p></div>';
                 lucide.createIcons();
                 return;
             }
 
-            srcCont.innerHTML = '';
-            tgtCont.innerHTML = '';
+            srcCont.innerHTML = sentences.map(s => `
+                <div class="bg-white dark:bg-slate-700 p-4 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm">${s.source}</div>
+            `).join('');
 
-            sentences.forEach(s => {
-                const sEl = document.createElement('div');
-                sEl.className = 'bg-white dark:bg-slate-700 p-4 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm transition-all hover:border-blue-200 dark:hover:border-blue-800';
-                sEl.innerText = s.source;
-                srcCont.appendChild(sEl);
-
-                const tEl = document.createElement('div');
-                tEl.className = 'bg-blue-50/60 dark:bg-blue-900/30 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50 shadow-sm';
-                
-                if (s.translation === "...") {
-                    tEl.innerHTML = `<div class="flex items-center gap-2 text-blue-500 animate-pulse"><div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div><span>กำลังแปล...</span></div>`;
-                } else {
-                    tEl.innerHTML = `
-                        <div class="flex justify-between items-start gap-2">
+            tgtCont.innerHTML = sentences.map(s => `
+                <div class="bg-blue-50/60 dark:bg-blue-900/30 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50 shadow-sm">
+                    ${s.translation === "..." ? 
+                        '<div class="flex items-center gap-2 text-blue-500 animate-pulse"><div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div><span>กำลังแปล...</span></div>' : 
+                        `<div class="flex justify-between items-start gap-2">
                             <p class="text-blue-900 dark:text-blue-100 font-medium">${s.translation}</p>
-                            <button class="speak-item text-blue-400 hover:text-blue-600 transition-colors" data-text="${s.translation.replace(/"/g, '&quot;')}">
+                            <button class="speak-item text-blue-400" onclick="window.speakFromUI('${s.translation.replace(/'/g, "\\'")}')">
                                 <i data-lucide="volume-2" class="w-5 h-5"></i>
                             </button>
-                        </div>
-                    `;
-                }
-                tgtCont.appendChild(tEl);
-            });
+                        </div>`
+                    }
+                </div>
+            `).join('');
 
-            document.querySelectorAll('.speak-item').forEach(b => b.onclick = () => speakText(b.dataset.text));
             lucide.createIcons();
             srcCont.scrollTop = srcCont.scrollHeight;
             tgtCont.scrollTop = tgtCont.scrollHeight;
         }
+
+        window.speakFromUI = (text) => speakText(text);
 
         function updateInterimUI(text) {
             const old = document.getElementById('interim-box');
@@ -517,19 +468,11 @@
         function updateMicUI() {
             const btn = document.getElementById('micBtn');
             const icon = document.getElementById('micIcon');
-            if (isListening) {
-                btn.className = "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-red-500 hover:bg-red-600 shadow-xl transition-all transform active:scale-95 flex items-center justify-center pulse-red";
-                icon.setAttribute('data-lucide', 'square');
-                document.getElementById('recordingIndicator').classList.remove('hidden');
-                document.getElementById('micStatusText').innerText = "กำลังรับเสียง...";
-                document.getElementById('visualizerContainer').classList.remove('hidden');
-            } else {
-                btn.className = "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-xl transition-all transform active:scale-95 flex items-center justify-center";
-                icon.setAttribute('data-lucide', 'mic');
-                document.getElementById('recordingIndicator').classList.add('hidden');
-                document.getElementById('micStatusText').innerText = "แตะเพื่อพูด";
-                document.getElementById('visualizerContainer').classList.add('hidden');
-            }
+            btn.className = isListening ? "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-red-500 shadow-xl flex items-center justify-center pulse-red" : "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-blue-600 shadow-xl flex items-center justify-center";
+            icon.setAttribute('data-lucide', isListening ? 'square' : 'mic');
+            document.getElementById('recordingIndicator').classList.toggle('hidden', !isListening);
+            document.getElementById('micStatusText').innerText = isListening ? "กำลังรับเสียง..." : "แตะเพื่อพูด";
+            document.getElementById('visualizerContainer').classList.toggle('hidden', !isListening);
             lucide.createIcons();
         }
 
@@ -543,8 +486,8 @@
             navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
                 mediaStreamSource = audioContext.createMediaStreamSource(stream);
                 mediaStreamSource.connect(analyser);
-                drawVisualizer();
-            }).catch(e => console.error("Mic access denied", e));
+                drawVis();
+            });
         }
 
         function stopVisualizer() {
@@ -552,8 +495,8 @@
             if (mediaStreamSource) mediaStreamSource.disconnect();
         }
 
-        function drawVisualizer() {
-            animationId = requestAnimationFrame(drawVisualizer);
+        function drawVis() {
+            animationId = requestAnimationFrame(drawVis);
             analyser.getByteFrequencyData(dataArray);
             const ctx = waveform.getContext('2d');
             const w = waveform.width = waveform.offsetWidth;

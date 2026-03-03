@@ -3,546 +3,213 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Voice Translator & History (Google Translate)</title>
+    <title>Analogic SCAN Sequence Troubleshooting</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;700&display=swap');
-        
-        :root { --primary: #2563eb; }
-        html.dark { --primary: #3b82f6; }
-
         body {
             font-family: 'Sarabun', sans-serif;
-            transition: background-color 0.3s, color 0.3s;
         }
-
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
-        
-        .pulse-red { animation: pulse-red 2s infinite; }
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        @media print {
+            body { background-color: white !important; }
+            .no-print { display: none !important; }
+            .print-break-inside-avoid { break-inside: avoid; }
+            .shadow-lg { box-shadow: none !important; border: 1px solid #e5e7eb; }
         }
-
-        canvas { width: 100%; height: 60px; }
-        
-        .modal-enter { opacity: 0; transform: scale(0.95); }
-        .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms, transform 200ms; }
     </style>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Sarabun', 'sans-serif'] }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="bg-gray-50 dark:bg-slate-900 h-screen flex flex-col text-slate-800 dark:text-slate-100 overflow-hidden">
+<body class="bg-slate-100 text-slate-800 p-3 sm:p-4 md:p-8">
 
-    <!-- Header -->
-    <header class="bg-blue-600 dark:bg-blue-800 text-white shadow-md z-10 shrink-0 transition-colors duration-300">
-        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <i data-lucide="languages" class="w-6 h-6 text-yellow-300"></i>
-                <h1 class="text-xl font-bold hidden sm:block">AI Translator & History</h1>
-                <h1 class="text-xl font-bold sm:hidden">แปลภาษาสด</h1>
+    <div class="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
+            <div class="w-full text-center md:text-left">
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-800">SCAN Sequence Troubleshooting Technique</h1>
+                <p class="text-slate-500 text-xs sm:text-sm mt-1">Rev: 25-25-08 | สำหรับช่างเทคนิคที่ผ่านการรับรองจาก Analogic เท่านั้น (2025)</p>
             </div>
-            
-            <div class="flex items-center gap-3">
-                <span id="cloudStatus" class="flex items-center gap-1 text-xs font-medium text-blue-200">
-                    <i data-lucide="cloud-off" class="w-4 h-4"></i> ออฟไลน์
+            <div class="w-full md:w-auto mt-4 md:mt-0 flex justify-center md:justify-end items-center gap-3 sm:space-x-4">
+                <span class="px-3 sm:px-4 py-1 bg-slate-200 text-slate-700 rounded-full text-xs sm:text-sm font-semibold tracking-wide">
+                    analogic
                 </span>
-                <button id="themeToggle" class="p-2 hover:bg-white/20 rounded-full transition" title="สลับโหมดมืด/สว่าง">
-                    <i data-lucide="moon" id="themeIcon" class="w-5 h-5"></i>
-                </button>
-                <div class="h-6 w-px bg-white/30"></div>
-                <button id="clearBtn" class="hidden px-3 py-1.5 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-400 text-white transition shadow-sm">
-                    ล้างประวัติ
+                <button onclick="window.print()" class="no-print bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center shadow-sm flex-shrink-0">
+                    <svg class="w-4 h-4 mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    พิมพ์หน้านี้
                 </button>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- Visualizer Area -->
-    <div id="visualizerContainer" class="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 h-16 hidden flex items-center px-4 transition-colors duration-300 shadow-inner">
-        <canvas id="waveform"></canvas>
+        <!-- Main Content 4 Columns -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
+            
+            <!-- Step 1: Flushing -->
+            <div class="bg-white rounded-xl shadow-sm border-t-4 border-slate-400 p-4 sm:p-5 flex flex-col print-break-inside-avoid">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <h2 class="text-lg font-bold text-slate-700">Flushing</h2>
+                    <span class="bg-slate-200 text-slate-600 w-8 h-8 rounded-full flex items-center justify-center font-bold">1</span>
+                </div>
+                
+                <div class="space-y-4 text-sm flex-grow">
+                    <div>
+                        <h3 class="font-bold text-slate-800 mb-1">1. Run Main Scanner Belt</h3>
+                        <p class="text-slate-600 text-xs mb-2 italic">เงื่อนไข: ต้องมีไฟเลี้ยงระบบแล้ว</p>
+                        <p>กด <span class="text-red-600 font-semibold">Control</span> บน Home screen; กด <span class="text-red-600 font-semibold">Forward</span> บน conveyor section</p>
+                        <ul class="list-disc pl-5 mt-2 space-y-1 text-slate-700">
+                            <li><strong>หากไม่ขยับ:</strong> ตรวจสอบ motor controllers (ต้องเป็นสีเขียวใน SDSW)</li>
+                            <li>ตรวจสอบ power และ comms ของ motor controller</li>
+                            <li>ถ้าเป็นสีเขียว, ตรวจสอบสิ่งกีดขวางทางกายภาพ</li>
+                            <li>ตรวจสอบความเร็วรันไทม์ต้องอยู่ที่ 15 cm/s</li>
+                        </ul>
+                        <p class="mt-2">คลิก <span class="text-red-600 font-semibold">Stop</span></p>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100">
+                        <h3 class="font-bold text-slate-800 mb-1">1.1 Test Analogic Mid Size BHS Zones</h3>
+                        <p class="mt-2">กด <span class="text-red-600 font-semibold">Mid size ACS</span> บน Home screen; กด <span class="text-red-600 font-semibold">Forward</span> ในแต่ละ Zone, กด <span class="text-red-600 font-semibold">Stop</span> หลังทดสอบทีละโซน</p>
+                        <p class="mt-2 text-slate-600">สังเกตหาข้อผิดพลาด หรือการลื่นไถล (Slipping)</p>
+                        <p class="text-xs text-slate-500 mt-2 bg-slate-50 p-2 rounded border border-slate-100 italic">หมายเหตุ: โซน 2 ไม่สามารถประเมินได้ด้วยการทดสอบนี้</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Spinup -->
+            <div class="bg-white rounded-xl shadow-sm border-t-4 border-slate-500 p-4 sm:p-5 flex flex-col print-break-inside-avoid">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <h2 class="text-lg font-bold text-slate-700">Spinup</h2>
+                    <span class="bg-slate-200 text-slate-600 w-8 h-8 rounded-full flex items-center justify-center font-bold">2</span>
+                </div>
+                
+                <div class="space-y-4 text-sm flex-grow">
+                    <div>
+                        <h3 class="font-bold text-slate-800 mb-1">2. Turn Powerlink ON</h3>
+                        <p class="text-slate-600 text-xs mb-2 italic">เงื่อนไข: safety controller ทำงานปกติ</p>
+                        <p>จากหน้า Control screen; กด <span class="text-red-600 font-semibold">Powerlink Enable</span></p>
+                        <ul class="list-disc pl-5 mt-2 space-y-1 text-slate-700">
+                            <li><strong>ถ้าไฟ Inverter แดง:</strong> (ไม่มีค่าแสดงและพัดลมเงียบ) &rarr; แก้ปัญหาที่ Powerlink</li>
+                            <li><strong>ถ้าไฟ Inverter เขียว:</strong> (ได้ยินเสียงพัดลม) &rarr; แก้ปัญหาที่ Datalink</li>
+                        </ul>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100">
+                        <h3 class="font-bold text-slate-800 mb-1">2.1 Rotate the Drum</h3>
+                        <p>จากหน้า Control Screen; กด <span class="text-red-600 font-semibold">Run</span> ในส่วน Gantry. ยืนยันความเร็ว Gantry ต้องเพิ่มขึ้นเป็น <strong>130 RPM</strong></p>
+                        
+                        <div class="mt-3 bg-red-50 p-3 rounded-lg border border-red-100">
+                            <h4 class="font-bold text-red-800 mb-1 text-xs">กรณีค่า RPM ไม่สม่ำเสมอ</h4>
+                            <ul class="list-disc pl-4 space-y-1 text-red-900 text-xs">
+                                <li>ถ้าไม่ได้ยินเสียงหมุนและไม่มีค่า: ดูสถานะ motor controller (ต้องเขียวใน SDSW)</li>
+                                <li>ถ้าไฟเขียวแต่ไม่ได้ยินเสียงหมุน: แก้ปัญหา Datalink</li>
+                                <li>ถ้าไฟไม่เขียว: แก้ปัญหาระบบไฟ (Power issue)</li>
+                            </ul>
+                        </div>
+
+                        <div class="mt-3 bg-orange-50 p-3 rounded-lg border border-orange-100">
+                            <h4 class="font-bold text-orange-800 mb-1 text-xs">ค่า RPM ขึ้นแล้วตก (หมุนไม่ถึงความเร็วเป้าหมาย)</h4>
+                            <p class="text-xs text-orange-900">พร้อมกับมีไฟรีเซ็ต interlock กะพริบ &rarr; ให้แก้ปัญหาที่ <strong>Safety Controller</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Calibration -->
+            <div class="bg-white rounded-xl shadow-sm border-t-4 border-teal-500 p-4 sm:p-5 flex flex-col print-break-inside-avoid">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <h2 class="text-lg font-bold text-teal-700">Calibration</h2>
+                    <span class="bg-teal-100 text-teal-700 w-8 h-8 rounded-full flex items-center justify-center font-bold">3</span>
+                </div>
+                
+                <div class="space-y-4 text-sm flex-grow">
+                    <div>
+                        <h3 class="font-bold text-slate-800 mb-1">3. Perform Calibrations</h3>
+                        <p class="text-slate-600 text-xs mb-2 italic">เงื่อนไข: datalink, Powerlink, และ safety circuits ทำงานปกติ</p>
+                        <p>จากหน้า <span class="text-red-600 font-semibold">Control</span> screen</p>
+                        
+                        <div class="mt-4">
+                            <p class="font-semibold text-slate-800">กดปุ่ม <span class="text-red-600">Offset</span></p>
+                            <ul class="list-disc pl-5 mt-1 text-slate-700">
+                                <li>หากล้มเหลว (fails), ให้ดูคู่มือ Offset Calibration</li>
+                            </ul>
+                        </div>
+
+                        <div class="mt-4">
+                            <p class="font-semibold text-slate-800">กดปุ่ม <span class="text-red-600">Air</span></p>
+                            <p class="text-xs text-slate-600 mt-1 mb-2 leading-relaxed">หมายเหตุ: เมื่อทำการ Air calibration รังสี X-ray จะถูกเปิดใช้งานสั้นๆ อัตโนมัติ หากมีปัญหากับระบบ x-ray การปรับเทียบนี้จะไม่สำเร็จ</p>
+                            <ul class="list-disc pl-5 mt-1 space-y-1 text-slate-700">
+                                <li>หากเกิด X-ray fault หรือล้มเหลวก่อนเริ่มปรับเทียบ ให้ดูคู่มือ X-ray troubleshooting</li>
+                                <li>หากทำ Air calibration ไม่ผ่าน (fails) ให้ดูคู่มือ Air Calibration</li>
+                                <li><strong class="text-teal-700">หาก Air Calibration ผ่าน (passes):</strong> ระบบ x-ray ทำงานถูกต้อง ให้ไปขั้นตอนต่อไป</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Scan -->
+            <div class="bg-white rounded-xl shadow-sm border-t-4 border-emerald-500 p-4 sm:p-5 flex flex-col print-break-inside-avoid">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <h2 class="text-lg font-bold text-emerald-700">Scan</h2>
+                    <span class="bg-emerald-100 text-emerald-700 w-8 h-8 rounded-full flex items-center justify-center font-bold">4</span>
+                </div>
+                
+                <div class="space-y-4 text-sm flex-grow">
+                    <div>
+                        <h3 class="font-bold text-slate-800 mb-1">4. Generate X-Rays</h3>
+                        <p class="text-slate-600 text-xs mb-2 italic">เงื่อนไข: x-ray ทำงานได้นานพอที่จะผ่าน Air calibration</p>
+                        
+                        <ul class="list-disc pl-5 mt-2 space-y-2 text-slate-700">
+                            <li>จากหน้า Control screen</li>
+                            <li>กด <span class="text-red-600 font-semibold">On</span> ในส่วน Generator</li>
+                            <li>ดูตาราง run time values เพื่อดูให้แน่ใจว่า X-ray voltage อยู่ที่ <strong>160KV</strong> และ current อยู่ที่ <strong>5mA</strong></li>
+                            <li>หาก X-rays ไม่ติด หรือติดแค่แป๊บเดียว หรือค่ากระแส/แรงดันไม่ถึงเกณฑ์ ให้แก้ปัญหาที่ X-ray</li>
+                        </ul>
+
+                        <div class="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-emerald-800 font-medium text-center">
+                            หาก X-Rays เปิดและทำงานต่อเนื่องได้ แสดงว่าระบบพร้อมใช้งาน (System is operational)
+                        </div>
+
+                        <div class="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs leading-relaxed text-slate-600">
+                            <p class="font-semibold text-slate-700 mb-1">หมายเหตุสำคัญ:</p>
+                            หากคุณสามารถผ่านขั้นตอนการสแกนในคู่มือนี้ได้ แต่ไม่สามารถสแกนหน้างานจริงตามปกติ อาจมีปัญหากับส่วนประกอบภายนอกที่เชื่อมต่ออยู่ (เช่น BHS conveyor หรือ PAX system)
+                            <br><br>
+                            ให้ทำการ Bypass ส่วนประกอบภายนอกนั้น และลองพยายามเข้าสู่โหมด normal scan ดูอีกครั้ง
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Relevant Troubleshooting Articles -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 mt-4 sm:mt-6 print-break-inside-avoid">
+            <h2 class="text-base sm:text-lg font-bold text-slate-800 mb-3 sm:mb-4 border-b pb-2">Relevant Troubleshooting Articles (บทความอ้างอิง)</h2>
+            <div class="flex flex-wrap gap-2 sm:gap-3 justify-center md:justify-start">
+                <!-- Row 1 -->
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-500 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">Motion Troubleshooting</span>
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-emerald-600 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">Safety Controller Troubleshooting</span>
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-red-800 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">Datalink Troubleshooting</span>
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-900 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">X-Ray Troubleshooting</span>
+                
+                <!-- Row 2 -->
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-lime-700 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">Safety Controller Troubleshooting</span>
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-orange-700 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">Powerlink Troubleshooting</span>
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">Offset Calibration Troubleshooting</span>
+                
+                <!-- Row 3 -->
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">Analogic BHS Troubleshooting</span>
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-rose-800 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">Datalink Troubleshooting</span>
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-sky-600 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">Air Calibration Troubleshooting</span>
+                <span class="px-3 py-1.5 sm:px-4 sm:py-2 bg-indigo-800 text-white rounded-full text-xs sm:text-sm font-medium shadow-sm">X-Ray Troubleshooting</span>
+            </div>
+            
+            <p class="mt-4 sm:mt-6 text-center text-slate-500 text-[10px] sm:text-xs italic leading-relaxed">
+                Detailed troubleshooting articles are published to your respective service portal. <br class="hidden sm:block">
+                ขั้นตอนเหล่านี้ออกแบบมาเพื่อจำลองกระบวนการเข้าสู่โหมดสแกนของเครื่อง ช่วยตีกรอบปัญหาให้แคบลงจนทราบระบบย่อยที่มีปัญหาภายในเวลา 15 นาที (แต่ละขั้นตอนอาศัยความสำเร็จของขั้นตอนก่อนหน้า)
+            </p>
+        </div>
+
     </div>
 
-    <!-- Main Content -->
-    <main class="flex-1 overflow-hidden flex flex-col md:flex-row p-2 sm:p-4 gap-4 max-w-[1600px] w-full mx-auto relative">
-        
-        <!-- Loading Overlay -->
-        <div id="loadingOverlay" class="absolute inset-0 z-20 bg-gray-50/90 dark:bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center">
-            <div id="loadingSpinner" class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p id="loadingText" class="text-blue-600 dark:text-blue-400 font-medium text-center px-4">กำลังเตรียมพร้อมระบบ...</p>
-            <button id="retryBtn" class="hidden mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">ลองใหม่อีกครั้ง</button>
-            
-            <!-- Setup Guide -->
-            <div id="setupGuide" class="hidden mt-6 p-4 bg-white dark:bg-slate-800 rounded-lg border border-red-200 dark:border-red-900 max-w-sm text-center">
-                <p class="text-red-500 text-xs font-bold mb-2 uppercase">แนะนำการตั้งค่า:</p>
-                <p class="text-gray-600 dark:text-gray-300 text-xs leading-relaxed">
-                    แอปพลิเคชันกำลังพยายามเชื่อมต่อฐานข้อมูล กรุณารอครู่หนึ่งหรือตรวจสอบสัญญาณอินเทอร์เน็ต
-                </p>
-            </div>
-        </div>
-
-        <!-- Left Side: Source -->
-        <section class="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden transition-colors duration-300">
-            <div class="bg-gray-50 dark:bg-slate-900/50 p-3 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between gap-2 shrink-0">
-                <div class="flex items-center gap-2 flex-1">
-                    <select id="sourceLangSelect" class="bg-transparent dark:text-white text-sm font-semibold outline-none border-b-2 border-transparent focus:border-blue-500 px-1 py-1 cursor-pointer">
-                    </select>
-                </div>
-                <div id="recordingIndicator" class="hidden flex items-center gap-2 text-red-500 text-xs font-bold animate-pulse bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-md border border-red-100 dark:border-red-900/50">
-                    <span class="w-2 h-2 rounded-full bg-red-500"></span> REC
-                </div>
-            </div>
-
-            <div id="sourceContainer" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
-            </div>
-        </section>
-
-        <!-- Middle: Swap -->
-        <div class="hidden md:flex flex-col justify-center shrink-0">
-            <button id="swapBtn" class="p-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-full hover:bg-blue-50 dark:hover:bg-slate-600 transition shadow-sm transform hover:scale-105 active:scale-95 text-slate-600 dark:text-slate-300">
-                <i data-lucide="arrow-right-left" class="w-5 h-5"></i>
-            </button>
-        </div>
-
-        <!-- Right Side: Translation -->
-        <section class="flex-1 flex flex-col bg-blue-50/30 dark:bg-blue-900/10 rounded-xl shadow-sm border border-blue-100 dark:border-blue-900/30 overflow-hidden transition-colors duration-300">
-            <div class="bg-blue-50/80 dark:bg-slate-900/50 p-3 border-b border-blue-100 dark:border-slate-700 flex items-center justify-between gap-2 shrink-0">
-                <select id="targetLangSelect" class="bg-transparent dark:text-white text-sm font-semibold outline-none border-b-2 border-transparent focus:border-blue-500 px-1 py-1 cursor-pointer">
-                </select>
-            </div>
-
-            <div id="targetContainer" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
-            </div>
-        </section>
-    </main>
-
-    <!-- Bottom Controls -->
-    <footer class="p-4 sm:p-6 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 shadow-[0_-4px_15px_rgba(0,0,0,0.05)] shrink-0 flex items-center justify-center relative transition-colors duration-300">
-        <button id="swapBtnMobile" class="md:hidden absolute left-4 sm:left-6 p-2.5 sm:p-3 bg-gray-100 dark:bg-slate-700 rounded-full text-gray-600 dark:text-slate-300 shadow-sm border border-gray-200 dark:border-slate-600">
-            <i data-lucide="arrow-right-left" class="w-5 h-5"></i>
-        </button>
-
-        <div class="flex flex-col items-center gap-2">
-            <button id="micBtn" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-xl transition-all transform active:scale-95 flex items-center justify-center group relative overflow-hidden">
-                <div id="micHoverEffect" class="absolute inset-0 bg-white/20 scale-0 group-hover:scale-100 transition-transform rounded-full"></div>
-                <i id="micIcon" data-lucide="mic" class="w-8 h-8 sm:w-10 sm:h-10 relative z-10"></i>
-            </button>
-            <span id="micStatusText" class="text-[10px] sm:text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">แตะเพื่อพูด</span>
-        </div>
-
-        <div class="absolute right-4 sm:right-6 flex flex-col items-end gap-2">
-            <label class="inline-flex items-center cursor-pointer bg-gray-50 dark:bg-slate-900/50 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
-                <span class="mr-2 sm:mr-3 text-[10px] sm:text-xs font-medium text-gray-600 dark:text-gray-300">อ่านอัตโนมัติ</span>
-                <input type="checkbox" id="autoSpeakToggle" class="sr-only peer">
-                <div class="relative w-8 sm:w-9 h-4 sm:h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 sm:after:h-4 after:w-3 sm:after:w-4 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
-            </label>
-        </div>
-    </footer>
-
-    <!-- Confirm Modal -->
-    <div id="confirmModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden transition-opacity">
-        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 transform transition-all modal-enter border border-gray-100 dark:border-slate-700">
-            <div class="flex items-center gap-3 text-red-500 mb-4">
-                <div class="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
-                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-                </div>
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">ยืนยันการล้างประวัติ</h3>
-            </div>
-            <p class="text-gray-600 dark:text-gray-300 text-sm mb-6">คุณแน่ใจหรือไม่ที่จะลบประวัติการแปลทั้งหมด?</p>
-            <div class="flex items-center justify-end gap-3">
-                <button id="cancelClear" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition">ยกเลิก</button>
-                <button id="confirmClear" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition shadow-sm">ลบข้อมูล</button>
-            </div>
-        </div>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // --- 1. CONFIGURATION ---
-        const defaultFirebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : defaultFirebaseConfig;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'standalone-app';
-        
-        // Google Translate API Key (Environment provided)
-        const apiKey = ""; 
-
-        // --- 2. INITIALIZATION ---
-        let app, auth, db, currentUser, unsubscribeHistory;
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const loadingText = document.getElementById('loadingText');
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const retryBtn = document.getElementById('retryBtn');
-
-        const languages = [
-            { code: 'th-TH', iso: 'th', name: 'ไทย (Thai)' },
-            { code: 'en-US', iso: 'en', name: 'อังกฤษ (English)' },
-            { code: 'ja-JP', iso: 'ja', name: 'ญี่ปุ่น (Japanese)' },
-            { code: 'ko-KR', iso: 'ko', name: 'เกาหลี (Korean)' },
-            { code: 'zh-CN', iso: 'zh-CN', name: 'จีน (Chinese)' },
-            { code: 'fr-FR', iso: 'fr', name: 'ฝรั่งเศส (French)' },
-        ];
-
-        let isListening = false;
-        let sentences = [];
-        let sourceLang = languages[0];
-        let targetLang = languages[1];
-        let recognition = null;
-        let isDarkMode = false;
-        let audioContext, analyser, dataArray, mediaStreamSource, animationId;
-
-        async function init() {
-            try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-            } catch (err) {
-                console.error("Firebase init failed");
-                hideLoading();
-            }
-
-            setupUIListeners();
-            
-            loadingText.innerText = "กำลังเชื่อมต่อระบบ...";
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                console.error("Auth failed:", err);
-                hideLoading();
-            }
-
-            onAuthStateChanged(auth, (user) => {
-                currentUser = user;
-                updateCloudStatus(user);
-                if (user) {
-                    loadHistory();
-                } else {
-                    hideLoading();
-                }
-            });
-
-            setTimeout(hideLoading, 6000);
-        }
-
-        function setupUIListeners() {
-            const srcSelect = document.getElementById('sourceLangSelect');
-            const tgtSelect = document.getElementById('targetLangSelect');
-            languages.forEach(l => {
-                srcSelect.add(new Option(l.name, l.code));
-                tgtSelect.add(new Option(l.name, l.code));
-            });
-            srcSelect.value = sourceLang.code;
-            tgtSelect.value = targetLang.code;
-
-            if (window.matchMedia('(prefers-color-scheme: dark)').matches) toggleTheme(true);
-
-            document.getElementById('micBtn').onclick = toggleListening;
-            document.getElementById('themeToggle').onclick = () => toggleTheme();
-            document.getElementById('swapBtn').onclick = swapLanguages;
-            document.getElementById('swapBtnMobile').onclick = swapLanguages;
-            document.getElementById('clearBtn').onclick = openClearModal;
-            document.getElementById('cancelClear').onclick = closeModal;
-            document.getElementById('confirmClear').onclick = confirmClearHistory;
-            retryBtn.onclick = () => window.location.reload();
-
-            srcSelect.onchange = (e) => {
-                sourceLang = languages.find(l => l.code === e.target.value);
-                if (isListening) restartRecognition();
-            };
-            tgtSelect.onchange = (e) => targetLang = languages.find(l => l.code === e.target.value);
-
-            lucide.createIcons();
-        }
-
-        function updateCloudStatus(user) {
-            const status = document.getElementById('cloudStatus');
-            status.innerHTML = user ? `<i data-lucide="cloud-check" class="w-4 h-4 text-green-400"></i> ออนไลน์` : `<i data-lucide="cloud-off" class="w-4 h-4 text-red-400"></i> ออฟไลน์`;
-            lucide.createIcons();
-        }
-
-        function hideLoading() { loadingOverlay.classList.add('hidden'); }
-
-        // --- 3. FIRESTORE LOGIC ---
-        function loadHistory() {
-            if (!currentUser) return;
-            const historyRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'history');
-            unsubscribeHistory = onSnapshot(historyRef, (snapshot) => {
-                const loaded = [];
-                snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
-                loaded.sort((a, b) => a.timestamp - b.timestamp);
-                sentences = loaded;
-                renderUI();
-                hideLoading();
-            }, (error) => {
-                console.error("Firestore Error", error);
-                hideLoading();
-            });
-        }
-
-        async function saveTranslation(id, text, translationText) {
-            if (!currentUser) return;
-            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'history', id);
-            await setDoc(docRef, {
-                source: text,
-                translation: translationText,
-                sourceLang: sourceLang.code,
-                targetLang: targetLang.code,
-                timestamp: Date.now()
-            });
-        }
-
-        async function confirmClearHistory() {
-            if (!currentUser) return;
-            const deletePromises = sentences.map(s => 
-                deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'history', s.id))
-            );
-            await Promise.all(deletePromises);
-            closeModal();
-        }
-
-        function openClearModal() {
-            confirmModal.classList.remove('hidden');
-            setTimeout(() => confirmModal.firstElementChild.classList.add('modal-enter-active'), 10);
-        }
-
-        function closeModal() {
-            confirmModal.firstElementChild.classList.remove('modal-enter-active');
-            setTimeout(() => confirmModal.classList.add('hidden'), 200);
-        }
-
-        // --- 4. GOOGLE TRANSLATE API ---
-        async function callGoogleTranslate(text, source, target) {
-            const sourceCode = source.split('-')[0];
-            const targetCode = target.split('-')[0];
-            const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
-            
-            for (let i = 0; i < 5; i++) {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            q: text,
-                            source: sourceCode,
-                            target: targetCode,
-                            format: 'text'
-                        })
-                    });
-                    if (!response.ok) throw new Error('Translate API Error');
-                    const result = await response.json();
-                    return result.data.translations[0].translatedText;
-                } catch (e) {
-                    await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
-                }
-            }
-            return "ไม่สามารถแปลภาษาได้";
-        }
-
-        // --- 5. SPEECH & UI ---
-        function toggleListening() { isListening ? stopListening() : startListening(); }
-
-        function startListening() {
-            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRec) return alert("Browser not supported");
-
-            recognition = new SpeechRec();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = sourceLang.code;
-
-            recognition.onstart = () => {
-                isListening = true;
-                updateMicUI();
-                startVisualizer();
-            };
-
-            recognition.onresult = (event) => {
-                let interim = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    const text = event.results[i][0].transcript.trim();
-                    if (event.results[i].isFinal) {
-                        if (text) processSentence(text);
-                    } else interim += text;
-                }
-                updateInterimUI(interim);
-            };
-
-            recognition.onerror = () => stopListening();
-            recognition.onend = () => { if (isListening) recognition.start(); };
-            recognition.start();
-        }
-
-        function stopListening() {
-            isListening = false;
-            if (recognition) recognition.stop();
-            stopVisualizer();
-            updateMicUI();
-            updateInterimUI('');
-        }
-
-        async function processSentence(text) {
-            const id = "msg_" + Date.now();
-            await saveTranslation(id, text, "...");
-            const translation = await callGoogleTranslate(text, sourceLang.code, targetLang.code);
-            await saveTranslation(id, text, translation);
-            if (document.getElementById('autoSpeakToggle').checked) speakText(translation);
-        }
-
-        function renderUI() {
-            const hasData = sentences.length > 0;
-            const srcCont = document.getElementById('sourceContainer');
-            const tgtCont = document.getElementById('targetContainer');
-            document.getElementById('clearBtn').classList.toggle('hidden', !hasData);
-
-            if (!hasData) {
-                srcCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-20"><i data-lucide="mic" class="w-12 h-12 mb-2"></i><p>เริ่มพูดเพื่อแปลภาษา</p></div>';
-                tgtCont.innerHTML = '<div class="h-full flex flex-col items-center justify-center text-gray-400 opacity-20"><i data-lucide="languages" class="w-12 h-12 mb-2"></i><p>ผลการแปลจะแสดงที่นี่</p></div>';
-                lucide.createIcons();
-                return;
-            }
-
-            srcCont.innerHTML = sentences.map(s => `
-                <div class="bg-white dark:bg-slate-700 p-4 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm">${s.source}</div>
-            `).join('');
-
-            tgtCont.innerHTML = sentences.map(s => `
-                <div class="bg-blue-50/60 dark:bg-blue-900/30 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50 shadow-sm">
-                    ${s.translation === "..." ? 
-                        '<div class="flex items-center gap-2 text-blue-500 animate-pulse"><div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div><span>กำลังแปล...</span></div>' : 
-                        `<div class="flex justify-between items-start gap-2">
-                            <p class="text-blue-900 dark:text-blue-100 font-medium">${s.translation}</p>
-                            <button class="speak-item text-blue-400" onclick="window.speakFromUI('${s.translation.replace(/'/g, "\\'")}')">
-                                <i data-lucide="volume-2" class="w-5 h-5"></i>
-                            </button>
-                        </div>`
-                    }
-                </div>
-            `).join('');
-
-            lucide.createIcons();
-            srcCont.scrollTop = srcCont.scrollHeight;
-            tgtCont.scrollTop = tgtCont.scrollHeight;
-        }
-
-        window.speakFromUI = (text) => speakText(text);
-
-        function updateInterimUI(text) {
-            const old = document.getElementById('interim-box');
-            if (old) old.remove();
-            if (!text) return;
-            const div = document.createElement('div');
-            div.id = 'interim-box';
-            div.className = 'bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 opacity-60 italic text-sm';
-            div.innerText = text + "...";
-            document.getElementById('sourceContainer').appendChild(div);
-            document.getElementById('sourceContainer').scrollTop = document.getElementById('sourceContainer').scrollHeight;
-        }
-
-        function updateMicUI() {
-            const btn = document.getElementById('micBtn');
-            const icon = document.getElementById('micIcon');
-            btn.className = isListening ? "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-red-500 shadow-xl flex items-center justify-center pulse-red" : "w-16 h-16 sm:w-20 sm:h-20 rounded-full text-white bg-blue-600 shadow-xl flex items-center justify-center";
-            icon.setAttribute('data-lucide', isListening ? 'square' : 'mic');
-            document.getElementById('recordingIndicator').classList.toggle('hidden', !isListening);
-            document.getElementById('micStatusText').innerText = isListening ? "กำลังรับเสียง..." : "แตะเพื่อพูด";
-            document.getElementById('visualizerContainer').classList.toggle('hidden', !isListening);
-            lucide.createIcons();
-        }
-
-        function startVisualizer() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 64;
-                dataArray = new Uint8Array(analyser.frequencyBinCount);
-            }
-            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-                mediaStreamSource = audioContext.createMediaStreamSource(stream);
-                mediaStreamSource.connect(analyser);
-                drawVis();
-            });
-        }
-
-        function stopVisualizer() {
-            if (animationId) cancelAnimationFrame(animationId);
-            if (mediaStreamSource) mediaStreamSource.disconnect();
-        }
-
-        function drawVis() {
-            animationId = requestAnimationFrame(drawVis);
-            analyser.getByteFrequencyData(dataArray);
-            const ctx = waveform.getContext('2d');
-            const w = waveform.width = waveform.offsetWidth;
-            const h = waveform.height = waveform.offsetHeight;
-            ctx.clearRect(0, 0, w, h);
-            const barW = (w / dataArray.length) * 2.5;
-            let x = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-                const barH = (dataArray[i] / 255) * h;
-                ctx.fillStyle = isDarkMode ? '#60a5fa' : '#2563eb';
-                ctx.fillRect(x, h - barH, barW - 2, barH);
-                x += barW;
-            }
-        }
-
-        function toggleTheme(dark = null) {
-            isDarkMode = dark !== null ? dark : !isDarkMode;
-            document.documentElement.classList.toggle('dark', isDarkMode);
-            document.getElementById('themeIcon').setAttribute('data-lucide', isDarkMode ? 'sun' : 'moon');
-            lucide.createIcons();
-        }
-
-        function swapLanguages() {
-            [sourceLang, targetLang] = [targetLang, sourceLang];
-            document.getElementById('sourceLangSelect').value = sourceLang.code;
-            document.getElementById('targetLangSelect').value = targetLang.code;
-            if (isListening) restartRecognition();
-        }
-
-        function speakText(text) {
-            if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel();
-            const ut = new SpeechSynthesisUtterance(text);
-            ut.lang = targetLang.code;
-            window.speechSynthesis.speak(ut);
-        }
-
-        function restartRecognition() {
-            if (recognition) {
-                recognition.stop();
-                setTimeout(() => { if (isListening) startListening(); }, 400);
-            }
-        }
-
-        window.onload = init;
-    </script>
 </body>
 </html>
+
 
